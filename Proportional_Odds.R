@@ -165,26 +165,26 @@ base_layer<-ggplot(data=grid,aes(x=H1,y=H2,colour=class))+
   ggtitle("Decision Boundaries")+
   geom_point(size=3.5,alpha=1,shape=15)
 print(base_layer)
-train_plot<-base_layer+geom_text(data=TRAIN,aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
+train_plot<-base_layer+geom_text(data=TEST,aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
   ggtitle("Decision Boundaries and All Classes")
 print(train_plot)
 
 
 ###look at each independently
 type="D"
-train_plot<-base_layer+geom_text(data=TRAIN[TRAIN$Productivity==type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
+train_plot<-base_layer+geom_text(data=TEST[TEST$Productivity==type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
   ggtitle(paste("Decision Boundaries and Class",type))
 print(train_plot)
 type="C"
-train_plot<-base_layer+geom_text(data=TRAIN[TRAIN$Productivity==type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
+train_plot<-base_layer+geom_text(data=TEST[TEST$Productivity==type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
   ggtitle(paste("Decision Boundaries and Class",type))
 print(train_plot)
 type="B"
-train_plot<-base_layer+geom_text(data=TRAIN[TRAIN$Productivity==type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
+train_plot<-base_layer+geom_text(data=TEST[TEST$Productivity==type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
   ggtitle(paste("Decision Boundaries and Class",type))
 print(train_plot)
 type="A"
-train_plot<-base_layer+geom_text(data=TRAIN[TRAIN$Productivity==type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
+train_plot<-base_layer+geom_text(data=TEST[TEST$Productivity==type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
   ggtitle(paste("Decision Boundaries and Class",type))
 print(train_plot)
 
