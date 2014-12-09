@@ -1,5 +1,5 @@
 ####################################################
-####SVM and Kernel Method Approach
+####SVM and Kernel Method Approaches
 ####################################################
 rm(list=ls())
 gc()
@@ -12,7 +12,6 @@ if(!require("kernlab"))
   (install.packages("kernlab"))
 if(!require("e1071"))
   (install.packages("e1071"))
-
 
 
 ###Import Data
@@ -54,6 +53,8 @@ weights<-table(TRAIN$Productivity)/nrow(TRAIN)
 # weights["B"]=0.01
 # weights["C"]=0.01
 # weights["D"]=0.01
+
+####Do A linear Fit
 svmfit=svm(Productivity~H1+H2,data=TRAIN,kernel="polynomial",
            cost=3,class.weights=weights,degree=1,scale=T)
 plot(svmfit,TRAIN,H1~H2)
@@ -68,6 +69,73 @@ summary(bestmod)
 
 plot(bestmod,TRAIN,H1~H2)
 
+
+
+#####Get test error
+class<-predict(bestmod,newdata=TEST)
+concordance<-numeric(length(class))
+for (i in 1:nrow(TEST)){
+  concordance[i]=as.numeric(TEST$Productivity[i] %in% class[i])                                   
+}
+print(round(mean(concordance),3))
+
+correct<-round(mean(concordance),3)*100
+
+
+###Plot the linear fit
+######Plot 2-D grid of Classification Rule
+create_grid<-function(x1,x2,n=1000){
+  min_x1<-min(x1)
+  max_x1<-max(x1)
+  x1_seq<-seq(min_x1,max_x1,length.out=floor(sqrt(n)))
+  min_x2<-min(x2)
+  max_x2<-max(x2)
+  x2_seq<-seq(min_x2,max_x2,length.out=floor(sqrt(n)))
+  grid<-expand.grid(H1=x1_seq,H2=x2_seq)
+  return(grid)
+}
+
+
+grid<-create_grid(DATA$H1,DATA$H2,n=10000)
+grid$class<-predict(bestmod,newdata = grid)
+
+
+
+###Get Actual Latent Projections
+###Geom Contour doesn't plot this well
+func=predict(bestmod,newdata = grid,decision.values = T)
+func=attributes(func)$decision
+func<-data.frame(grid,func)
+
+
+base_layer<-ggplot(data=grid,aes(x=H1,y=H2,colour=class))+
+  ggtitle("Decision Boundaries")+
+  geom_point(size=3.5,alpha=1,shape=15)
+print(base_layer)
+
+train_plot<-base_layer+geom_text(data=TEST,aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
+  ggtitle("Decision Boundaries and All Classes")
+print(train_plot)
+
+
+###look at each independently
+type=c("D","C")
+train_plot<-base_layer+geom_text(data=TEST[TEST$Productivity %in% type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
+  ggtitle(paste("Decision Boundaries, Margin, and Class",paste(type,collapse = " ")))+stat_contour(data=func,aes(x=H1,y=H2,z=C.D),breaks=c(-1,1),colour="black")
+print(train_plot)
+type=c("C","B")
+train_plot<-base_layer+geom_text(data=TEST[TEST$Productivity %in% type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
+  ggtitle(paste("Decision Boundaries, Margin, and Class",paste(type,collapse = " ")))+stat_contour(data=func,aes(x=H1,y=H2,z=B.C),breaks=c(-1,1),colour="black")
+print(train_plot)
+type=c("B","A")
+train_plot<-base_layer+geom_text(data=TEST[TEST$Productivity %in% type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
+  ggtitle(paste("Decision Boundaries, Margin, and Class",paste(type,collapse = " ")))+stat_contour(data=func,aes(x=H1,y=H2,z=B.A),breaks=c(-1,1),colour="black")
+print(train_plot)
+
+
+
+
+###Do a radial fit
 tune.out<-tune(svm,Productivity~H1+H2,data=TRAIN,kernel="radial",
                class.weights=weights,scale=T,
                ranges=list(cost=c(0.001,0.01,1,5,10,100)))
@@ -77,17 +145,6 @@ bestmod=tune.out$best.model
 summary(bestmod)
 
 plot(bestmod,TRAIN,H1~H2)
-
-
-#####Get training error
-class<-predict(bestmod)
-concordance<-numeric(length(class))
-for (i in 1:nrow(TRAIN)){
-  concordance[i]=as.numeric(TRAIN$Productivity[i] %in% class[i])                                   
-}
-print(round(mean(concordance),3))
-correct<-round(mean(concordance),3)*100
-
 
 
 
@@ -118,31 +175,37 @@ create_grid<-function(x1,x2,n=1000){
 grid<-create_grid(DATA$H1,DATA$H2,n=10000)
 grid$class<-predict(bestmod,newdata = grid)
 
+
+
+###Get Actual Latent Projections
+###Geom Contour doesn't plot this well
+func=predict(bestmod,newdata = grid,decision.values = T)
+func=attributes(func)$decision
+func<-data.frame(grid,func)
+
+
 base_layer<-ggplot(data=grid,aes(x=H1,y=H2,colour=class))+
   ggtitle("Decision Boundaries")+
   geom_point(size=3.5,alpha=1,shape=15)
 print(base_layer)
+
 train_plot<-base_layer+geom_text(data=TEST,aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
   ggtitle("Decision Boundaries and All Classes")
 print(train_plot)
 
 
 ###look at each independently
-type="D"
-train_plot<-base_layer+geom_text(data=TEST[TEST$Productivity==type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
-  ggtitle(paste("Decision Boundaries and Class",type))
+type=c("D","C")
+train_plot<-base_layer+geom_text(data=TEST[TEST$Productivity %in% type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
+  ggtitle(paste("Decision Boundaries, Margin, and Class",paste(type,collapse = " ")))+stat_contour(data=func,aes(x=H1,y=H2,z=C.D),breaks=c(-1,1),colour="black")
 print(train_plot)
-type="C"
-train_plot<-base_layer+geom_text(data=TEST[TEST$Productivity==type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
-  ggtitle(paste("Decision Boundaries and Class",type))
+type=c("C","B")
+train_plot<-base_layer+geom_text(data=TEST[TEST$Productivity %in% type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
+  ggtitle(paste("Decision Boundaries, Margin, and Class",paste(type,collapse = " ")))+stat_contour(data=func,aes(x=H1,y=H2,z=B.C),breaks=c(-1,1),colour="black")
 print(train_plot)
-type="B"
-train_plot<-base_layer+geom_text(data=TEST[TEST$Productivity==type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
-  ggtitle(paste("Decision Boundaries and Class",type))
-print(train_plot)
-type="A"
-train_plot<-base_layer+geom_text(data=TEST[TEST$Productivity==type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
-  ggtitle(paste("Decision Boundaries and Class",type))
+type=c("B","A")
+train_plot<-base_layer+geom_text(data=TEST[TEST$Productivity %in% type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
+  ggtitle(paste("Decision Boundaries, Margin, and Class",paste(type,collapse = " ")))+stat_contour(data=func,aes(x=H1,y=H2,z=B.A),breaks=c(-1,1),colour="black")
 print(train_plot)
 
 
