@@ -12,6 +12,10 @@ if(!require("kernlab"))
   (install.packages("kernlab"))
 if(!require("e1071"))
   (install.packages("e1071"))
+if(!require("dplyr"))
+  (install.packages("dplyr"))
+if(!require("reshape2"))
+  (install.packages("reshape2"))
 
 ###Import Data
 RAW_DATA<-read.csv("Raw_Data.csv")
@@ -60,7 +64,7 @@ ww<-table(TRAIN$Productivity)/nrow(TRAIN)
 cost=c(0.001,0.01,1,5,10,100)
 error<-cost
 for (i in 1:length(cost)){
-mod<-ksvm(Productivity~H1+H2,data=TRAIN,kernel="rbfdot",class.weights =NULL,
+mod<-ksvm(Productivity~H1+H2+Race,data=TRAIN,kernel="rbfdot",class.weights =NULL,
               kpar="automatic",cross=3,C=cost[i],prob.model=TRUE)
 print(paste("Loop",i,",C=",cost[i]))
 error[i]<-mod@cross
@@ -69,22 +73,12 @@ error[i]<-mod@cross
 plot(error,type="b")
 C=cost[which(error==min(error))]
 
-bestmod<-ksvm(Productivity~H1+H2,data=TRAIN,kernel="rbfdot", class.weights=NULL,
+bestmod<-ksvm(Productivity~H1+H2+Race,data=TRAIN,kernel="rbfdot", class.weights=NULL,
           kpar="automatic",cross=3,C=C,prob.model=TRUE)
 
 
 
-#####Get test error
-class<-predict(bestmod,newdata=TEST)
-concordance<-numeric(length(class))
-for (i in 1:nrow(TEST)){
-  concordance[i]=as.numeric(TEST$Productivity[i] %in% class[i])                                   
-}
-print(round(mean(concordance),3))
-
-correct<-round(mean(concordance),3)*100
-
-
+###Plot the linear fit
 ######Plot 2-D grid of Classification Rule
 create_grid<-function(x1,x2,n=1000){
   min_x1<-min(x1)
@@ -97,45 +91,43 @@ create_grid<-function(x1,x2,n=1000){
   return(grid)
 }
 
-
 grid<-create_grid(DATA$H1,DATA$H2,n=10000)
-grid$class<-predict(bestmod,newdata = grid)
 
 
-
-###Get Actual Latent Projections
-###Geom Contour doesn't plot this well
-func=predict(bestmod,newdata = grid,type ="probabilities" )
-func<-data.frame(grid,func)
+par_disp<-unique(TRAIN$Race)
+race=par_disp[1]
 
 
-base_layer<-ggplot(data=grid,aes(x=H1,y=H2,colour=class))+
-  ggtitle("Decision Boundaries")+
-  geom_point(size=3.5,alpha=1,shape=15)
-print(base_layer)
+for(race in par_disp){
+  CUT_TEST<-TEST[TEST$Race==race, ]
+  grid$Race=CUT_TEST$Race[1]
+  grid$class<-predict(bestmod,newdata = grid)
+  func=predict(bestmod,newdata = grid,type ="probabilities" )
+  func<-data.frame(grid,func)
+  class<-predict(bestmod,newdata=CUT_TEST)
+  concordance<-numeric(length(class))
+  for (i in 1:nrow(CUT_TEST)){
+    concordance[i]=as.numeric(CUT_TEST$Productivity[i] %in% class[i])                                   
+  }
+  correct<-round(mean(concordance),3)*100
+  
+#   base_layer<-ggplot(data=grid,aes(x=H1,y=H2,colour=class))+
+#     ggtitle(paste("Decision Boundaries, Race=",race))+
+#     geom_point(size=3.5,alpha=1,shape=15)
+#   
+#   train_plot<-base_layer+geom_text(data=CUT_TEST,aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
+#     ggtitle(paste("Decision Boundaries for",race,"Percent Correct=",correct,"%"))+facet_wrap(~Productivity,ncol=2)
+#   print(train_plot)
+    
+  plot_dat<-melt(func,id=c("H1","H2","Race","class"))
+  plot<-ggplot(data=plot_dat,aes(x=H1,y=H2,fill=value))+
+    geom_tile()+
+    stat_contour(data=plot_dat,aes(z=value))+
+    ggtitle(paste("Probability Distribution for",race,"Percent Correct=",correct,"%"))+
+    facet_wrap(~variable,ncol=2)
+  print(plot)  
+}
 
-train_plot<-base_layer+geom_text(data=TEST,aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
-  ggtitle("Decision Boundaries and All Classes")
-print(train_plot)
-
-
-###look at each probability distribution independently
-
-plot<-ggplot(data=func,aes(x=H1,y=H2,fill=D))+geom_tile()+stat_contour(aes(z=D))+
-  ggtitle("Probability Distribution for Class D")
-print(plot)
-
-plot<-ggplot(data=func,aes(x=H1,y=H2,fill=C))+geom_tile()+stat_contour(aes(z=D))+
-  ggtitle("Probability Distribution for Class C")
-print(plot)
-
-plot<-ggplot(data=func,aes(x=H1,y=H2,fill=B))+geom_tile()+stat_contour(aes(z=D))+
-  ggtitle("Probability Distribution for Class B")
-print(plot)
-
-plot<-ggplot(data=func,aes(x=H1,y=H2,fill=A))+geom_tile()+stat_contour(aes(z=D))+
-  ggtitle("Probability Distribution for Class A")
-print(plot)
 
 
 ##########################################################################
@@ -143,26 +135,11 @@ print(plot)
 #####This has a natural probabilisitc interpretation that SVM doesn't have
 ##########################################################################
 
-
-
-bestmod<-gausspr(Productivity~H1+H2,data=TRAIN,kernel="rbfdot",
+bestmod<-gausspr(Productivity~H1+H2+Race,data=TRAIN,kernel="rbfdot",
               kpar="automatic")
-bestmod
-predict(bestmod,TEST,type="probabilities")
-alpha(bestmod)
 
 
-#####Get test error
-class<-predict(bestmod,newdata=TEST)
-concordance<-numeric(length(class))
-for (i in 1:nrow(TEST)){
-  concordance[i]=as.numeric(TEST$Productivity[i] %in% class[i])                                   
-}
-print(round(mean(concordance),3))
-
-correct<-round(mean(concordance),3)*100
-
-
+###Plot the linear fit
 ######Plot 2-D grid of Classification Rule
 create_grid<-function(x1,x2,n=1000){
   min_x1<-min(x1)
@@ -175,45 +152,42 @@ create_grid<-function(x1,x2,n=1000){
   return(grid)
 }
 
-
 grid<-create_grid(DATA$H1,DATA$H2,n=10000)
-grid$class<-predict(bestmod,newdata = grid)
 
 
-
-###Get Actual Latent Projections
-###Geom Contour doesn't plot this well
-func=predict(bestmod,newdata = grid,type ="probabilities" )
-func<-data.frame(grid,func)
+par_disp<-unique(TRAIN$Race)
+race=par_disp[1]
 
 
-base_layer<-ggplot(data=grid,aes(x=H1,y=H2,colour=class))+
-  ggtitle("Decision Boundaries")+
-  geom_point(size=3.5,alpha=1,shape=15)
-print(base_layer)
+for(race in par_disp){
+  CUT_TEST<-TEST[TEST$Race==race, ]
+  grid$Race=CUT_TEST$Race[1]
+  func=predict(bestmod,newdata = grid,type ="probabilities" )
+  func<-data.frame(grid,func)
+  class<-predict(bestmod,newdata=CUT_TEST)
+  concordance<-numeric(length(class))
+  for (i in 1:nrow(CUT_TEST)){
+    concordance[i]=as.numeric(CUT_TEST$Productivity[i] %in% class[i])                                   
+  }
+  correct<-round(mean(concordance),3)*100
+  
+  #   base_layer<-ggplot(data=grid,aes(x=H1,y=H2,colour=class))+
+  #     ggtitle(paste("Decision Boundaries, Race=",race))+
+  #     geom_point(size=3.5,alpha=1,shape=15)
+  #   
+  #   train_plot<-base_layer+geom_text(data=CUT_TEST,aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
+  #     ggtitle(paste("Decision Boundaries for",race,"Percent Correct=",correct,"%"))+facet_wrap(~Productivity,ncol=2)
+  #   print(train_plot)
+  
+  plot_dat<-melt(func,id=c("H1","H2","Race"))
+  plot<-ggplot(data=plot_dat,aes(x=H1,y=H2,fill=value))+
+    geom_tile()+
+    stat_contour(data=plot_dat,aes(z=value))+
+    ggtitle(paste("Probability Distribution for",race,"Percent Correct=",correct,"%"))+
+    facet_wrap(~variable,ncol=2)
+  print(plot)  
+}
 
-train_plot<-base_layer+geom_text(data=TEST,aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
-  ggtitle("Decision Boundaries and All Classes")
-print(train_plot)
-
-
-###look at each probability distribution independently
-
-plot<-ggplot(data=func,aes(x=H1,y=H2,fill=D))+geom_tile()+stat_contour(aes(z=D))+
-  ggtitle("Probability Distribution for Class D")
-print(plot)
-
-plot<-ggplot(data=func,aes(x=H1,y=H2,fill=C))+geom_tile()+stat_contour(aes(z=D))+
-  ggtitle("Probability Distribution for Class C")
-print(plot)
-
-plot<-ggplot(data=func,aes(x=H1,y=H2,fill=B))+geom_tile()+stat_contour(aes(z=D))+
-  ggtitle("Probability Distribution for Class B")
-print(plot)
-
-plot<-ggplot(data=func,aes(x=H1,y=H2,fill=A))+geom_tile()+stat_contour(aes(z=D))+
-  ggtitle("Probability Distribution for Class A")
-print(plot)
 
 
 

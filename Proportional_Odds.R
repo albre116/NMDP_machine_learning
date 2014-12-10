@@ -130,7 +130,7 @@ race=par_disp[1]
 for(race in par_disp){
   
 CUT_TEST<-TEST[TEST$Race==race, ]
-grid$Race=race
+grid$Race=CUT_TEST$Race[1]
 grid$class<-predict(fit,newdata = grid)
 class<-predict(fit,newdata=CUT_TEST)
 concordance<-numeric(length(class))

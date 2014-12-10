@@ -90,7 +90,7 @@ race=par_disp[5]
 
 for(race in par_disp){
   CUT_TEST<-TEST[TEST$Race==race, ]
-  grid$Race=TEST$Race[1]
+  grid$Race=CUT_TEST$Race[1]
   grid$class<-predict(bestmod,newdata = grid)
   class<-predict(bestmod,newdata=CUT_TEST)
   concordance<-numeric(length(class))
@@ -148,7 +148,7 @@ race=par_disp[5]
 
 for(race in par_disp){
   CUT_TEST<-TEST[TEST$Race==race, ]
-  grid$Race=TEST$Race[1]
+  grid$Race=CUT_TEST$Race[1]
   grid$class<-predict(bestmod,newdata = grid)
   class<-predict(bestmod,newdata=CUT_TEST)
   concordance<-numeric(length(class))
