@@ -37,6 +37,7 @@ DATA$H2<-log(DATA$H2)
 
 
 ####Split Train and Test
+set.seed(1103)
 train_idx<-sample(1:nrow(DATA),floor(nrow(DATA)*0.8))
 logical<-rep(FALSE,nrow(DATA))
 logical[train_idx]<-TRUE
