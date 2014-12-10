@@ -4,6 +4,7 @@
 rm(list=ls())
 gc()
 graphics.off()
+op<-par()
 if(!require("MASS"))
   (install.packages("MASS"))
 if(!require("ggplot2"))
@@ -12,7 +13,6 @@ if(!require("ggplot2"))
 
 ###Import Data
 RAW_DATA<-read.csv("Raw_Data.csv")
-RAW_DATA$Frequency.1*RAW_DATA$Frequency.2
 permute<-rbinom(nrow(RAW_DATA),1,prob=0.5)==1
 RAW_DATA[permute,]<-RAW_DATA[permute,c(1:6,8,7,10,9,11:13)]
 DATA<-RAW_DATA[c("RID","Race","Frequency.1",
@@ -44,16 +44,19 @@ TEST<-DATA[test_idx,]
 
 
 ###Try a basic Proportional Odds Model on the genotype Frequencies
-fit<-polr(Productivity~GF,data=TRAIN)
+fit<-polr(Productivity~GF+Race,data=TRAIN)
 summary(fit)
 probs<-fitted(fit)
 display<-round(probs,2)
 geno_values<-seq(min(DATA$GF),max(DATA$GF),length.out=10000)
-pi_preds<-as.data.frame(predict(fit,newdata=data.frame("GF"=geno_values),
+
+####make charts for different races
+par_disp<-unique(TRAIN$Race)
+par(mfrow=c(3,2))
+race=par_disp[1]
+for(race in par_disp){
+pi_preds<-as.data.frame(predict(fit,newdata=data.frame("GF"=geno_values,"Race"=race),
                                 type="probs"))
-
-
-
 
 #calculate cutoff values
 Cutoff<-array(3)
@@ -66,65 +69,23 @@ for(i in 1:3){
 }
 print(round(Cutoff,2))
 t=signif(exp(Cutoff),3)
-print(t)
-
-
-plot(pi_preds$D~geno_values,ylim=c(0,1),type="l",lwd=2,
-     ylab="Membership Probability",xlab="log(Genotype Frequency)")
-title(main="Probability of Search Productivity Group by Genotype Freq",cex.main=.8)
-lines(pi_preds$C~geno_values,lwd=2,lty=2)
-lines(pi_preds$B~geno_values,lwd=2,lty=3)
-lines(pi_preds$A~geno_values,lwd=2,lty=4)
-legend("topleft",legend=c("Group D","Group C","Group B", "Group A"),lty=c(1:4),lwd=2,cex=.7)
-abline(v=Cutoff[1])
-abline(v=Cutoff[2])
-abline(v=Cutoff[3])
-
-###########################################
-#####Plot of the Training Data With Cutoffs
-####Concordance of the TRAINING DATA
-class<-predict(fit)
-concordance<-numeric(length(class))
-for (i in 1:nrow(TRAIN)){
-  concordance[i]=as.numeric(TRAIN$Productivity[i] %in% class[i])                                   
-}
-
-correct<-round(mean(concordance),3)*100
-
-
-plot(pi_preds$D~geno_values,ylim=c(0,1),type="l",lwd=2,
-     ylab="Membership Probability",xlab="log(Genotype Frequency)")
-title(main=paste0("Training Data Model Fit: ",correct,"% concordant"),cex.main=.8)
-lines(pi_preds$C~geno_values,lwd=2,lty=2)
-lines(pi_preds$B~geno_values,lwd=2,lty=3)
-lines(pi_preds$A~geno_values,lwd=2,lty=4)
-legend("topleft",legend=c("Group D","Group C","Group B", "Group A"),lty=c(1:4),lwd=2,cex=.7)
-abline(v=Cutoff[1])
-abline(v=Cutoff[2])
-abline(v=Cutoff[3])
-
-y<-as.numeric(TRAIN$Productivity)/4
-x<-TRAIN$GF
-text(x=x,y=y,labels=as.character(TRAIN$Productivity))
-
-
 
 ###########################################
 #####Plot of the Test Data With Cutoffs
 ####Concordance of the TEST DATA
-class<-predict(fit,newdata=data.frame("GF"=TEST$GF))
+CUT_TEST<-TEST[TEST$Race==race, ]
+class<-predict(fit,newdata=CUT_TEST)
 concordance<-numeric(length(class))
-for (i in 1:nrow(TEST)){
-  concordance[i]=as.numeric(TEST$Productivity[i] %in% class[i])                                   
+for (i in 1:nrow(CUT_TEST)){
+  concordance[i]=as.numeric(CUT_TEST$Productivity[i] %in% class[i])                                   
 }
 print(round(mean(concordance),3))
 
 correct<-round(mean(concordance),3)*100
 
-
 plot(pi_preds$D~geno_values,ylim=c(0,1),type="l",lwd=2,
      ylab="Membership Probability",xlab="log(Genotype Frequency)")
-title(main=paste0("Test Data Model Fit: ",correct,"% concordant"),cex.main=.8)
+title(main=paste0("Test Data Model Fit: ",correct,"% concordant ",race),cex.main=.8)
 lines(pi_preds$C~geno_values,lwd=2,lty=2)
 lines(pi_preds$B~geno_values,lwd=2,lty=3)
 lines(pi_preds$A~geno_values,lwd=2,lty=4)
@@ -133,9 +94,12 @@ abline(v=Cutoff[1])
 abline(v=Cutoff[2])
 abline(v=Cutoff[3])
 
-y<-as.numeric(TEST$Productivity)/4
-x<-TEST$GF
-text(x=x,y=y,labels=as.character(TEST$Productivity))
+y<-as.numeric(CUT_TEST$Productivity)/4
+x<-CUT_TEST$GF
+text(x=x,y=y,labels=as.character(CUT_TEST$Productivity))
+}
+
+par(op)###reset graphics
 
 
 
