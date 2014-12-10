@@ -54,6 +54,8 @@ geno_values<-seq(min(DATA$GF),max(DATA$GF),length.out=10000)
 par_disp<-unique(TRAIN$Race)
 par(mfrow=c(3,2))
 race=par_disp[1]
+
+
 for(race in par_disp){
 pi_preds<-as.data.frame(predict(fit,newdata=data.frame("GF"=geno_values,"Race"=race),
                                 type="probs"))
@@ -119,41 +121,31 @@ plot(H1~H2,data=DATA)###check data support
 plot(GF~I(H1+H2),data=DATA)###check that GF=H1*H2
 float<-lm(GF~I(H1+H2),data=DATA)
 abline(float)
-
-
 grid<-create_grid(DATA$H1,DATA$H2,n=10000)
 grid$GF<-(grid$H1+grid$H2)*float$coefficients[2]+float$coefficients[1]
-grid$class<-predict(fit,newdata = data.frame(GF=grid$GF))
 
+
+race=par_disp[1]
+for(race in par_disp){
+  
+CUT_TEST<-TEST[TEST$Race==race, ]
+grid$Race=race
+grid$class<-predict(fit,newdata = grid)
+class<-predict(fit,newdata=CUT_TEST)
+concordance<-numeric(length(class))
+for (i in 1:nrow(CUT_TEST)){
+  concordance[i]=as.numeric(CUT_TEST$Productivity[i] %in% class[i])                                   
+}
+correct<-round(mean(concordance),3)*100
 base_layer<-ggplot(data=grid,aes(x=H1,y=H2,colour=class))+
-  ggtitle("Decision Boundaries")+
+  ggtitle(paste("Decision Boundaries, Race=",race))+
   geom_point(size=3.5,alpha=1,shape=15)
-print(base_layer)
-train_plot<-base_layer+geom_text(data=TEST,aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
-  ggtitle("Decision Boundaries and All Classes")
+
+train_plot<-base_layer+geom_text(data=CUT_TEST,aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
+  ggtitle(paste("Decision Boundaries for",race,"Percent Correct=",correct,"%"))+facet_wrap(~Productivity,ncol=2)
 print(train_plot)
 
-
-###look at each independently
-type="D"
-train_plot<-base_layer+geom_text(data=TEST[TEST$Productivity==type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
-  ggtitle(paste("Decision Boundaries and Class",type))
-print(train_plot)
-type="C"
-train_plot<-base_layer+geom_text(data=TEST[TEST$Productivity==type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
-  ggtitle(paste("Decision Boundaries and Class",type))
-print(train_plot)
-type="B"
-train_plot<-base_layer+geom_text(data=TEST[TEST$Productivity==type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
-  ggtitle(paste("Decision Boundaries and Class",type))
-print(train_plot)
-type="A"
-train_plot<-base_layer+geom_text(data=TEST[TEST$Productivity==type,],aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
-  ggtitle(paste("Decision Boundaries and Class",type))
-print(train_plot)
-
-
-
+}
 
 
 
