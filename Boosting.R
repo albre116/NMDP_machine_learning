@@ -1,9 +1,10 @@
 ####################################################
-####More General Kernel Method Approaches
+####Boosting using trees
 ####################################################
 rm(list=ls())
 gc()
 graphics.off()
+op<-par()
 if(!require("MASS"))
   (install.packages("MASS"))
 if(!require("ggplot2"))
@@ -18,7 +19,8 @@ if(!require("dplyr"))
   (install.packages("dplyr"))
 if(!require("reshape2"))
   (install.packages("reshape2"))
-
+if(!require("nnet"))
+  (install.packages("nnet"))
 ###Import Data
 RAW_DATA<-read.csv("Raw_Data.csv")
 RAW_DATA$Frequency.1*RAW_DATA$Frequency.2
@@ -66,7 +68,7 @@ gbm1 <-
       n.trees=1000,                # number of trees
       shrinkage=0.05,              # shrinkage or learning rate,
       # 0.001 to 0.1 usually work
-      interaction.depth=1,         # 1: additive model, 2: two-way interactions, etc.
+      interaction.depth=3,         # 1: additive model, 2: two-way interactions, etc.
       bag.fraction = 0.5,          # subsampling fraction, 0.5 is probably best
       train.fraction = 0.5,        # fraction of data for training,
       # first train.fraction*N used for training
@@ -132,8 +134,37 @@ grid<-create_grid(DATA$H1,DATA$H2,n=10000)
 
 
 par_disp<-unique(TRAIN$Race)
-race=par_disp[1]
+race=par_disp[2]
 
+###look at the latent funciton F(X) that is squished by the sigmoid softmax function
+
+for(race in par_disp){
+  CUT_TEST<-TEST[TEST$Race==race, ]
+  grid$Race=CUT_TEST$Race[1]
+  func=predict(bestmod,newdata = grid,best.iter,type ="link" )
+  func<-data.frame(grid,func)
+  tmp<-predict(bestmod,newdata=CUT_TEST,best.iter,type="response")
+  class<-apply(tmp,1,function(b){
+    which(b==max(b))
+  })
+  class<-colnames(tmp)[class]
+  concordance<-numeric(length(class))
+  for (i in 1:nrow(CUT_TEST)){
+    concordance[i]=as.numeric(CUT_TEST$Productivity[i] %in% class[i])                                   
+  }
+  correct<-round(mean(concordance),3)*100
+  
+  
+  plot_dat<-melt(func,id=c("H1","H2","Race"))
+  plot<-ggplot(data=plot_dat,aes(x=H1,y=H2,fill=value))+
+    geom_tile()+
+    stat_contour(data=plot_dat,aes(z=value))+
+    ggtitle(paste("Probability Distribution for",levels_race[race],"Percent Correct=",correct,"%"))+
+    facet_wrap(~variable,ncol=2)
+  print(plot)  
+}
+
+###look at the response surface after applying the softmax function
 
 for(race in par_disp){
   CUT_TEST<-TEST[TEST$Race==race, ]
@@ -151,14 +182,6 @@ for(race in par_disp){
   }
   correct<-round(mean(concordance),3)*100
   
-  #   base_layer<-ggplot(data=grid,aes(x=H1,y=H2,colour=class))+
-  #     ggtitle(paste("Decision Boundaries, Race=",race))+
-  #     geom_point(size=3.5,alpha=1,shape=15)
-  #   
-  #   train_plot<-base_layer+geom_text(data=CUT_TEST,aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
-  #     ggtitle(paste("Decision Boundaries for",race,"Percent Correct=",correct,"%"))+facet_wrap(~Productivity,ncol=2)
-  #   print(train_plot)
-  
   
   plot_dat<-melt(func,id=c("H1","H2","Race"))
   plot<-ggplot(data=plot_dat,aes(x=H1,y=H2,fill=value))+
@@ -168,7 +191,6 @@ for(race in par_disp){
     facet_wrap(~variable,ncol=2)
   print(plot)  
 }
-
 
 
 

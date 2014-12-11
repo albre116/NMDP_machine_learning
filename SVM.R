@@ -13,6 +13,14 @@ if(!require("kernlab"))
   (install.packages("kernlab"))
 if(!require("e1071"))
   (install.packages("e1071"))
+if(!require("gbm"))
+  (install.packages("gbm"))
+if(!require("dplyr"))
+  (install.packages("dplyr"))
+if(!require("reshape2"))
+  (install.packages("reshape2"))
+if(!require("nnet"))
+  (install.packages("nnet"))
 
 
 ###Import Data
