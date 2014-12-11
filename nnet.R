@@ -23,7 +23,10 @@ if(!require("reshape2"))
   (install.packages("reshape2"))
 if(!require("nnet"))
   (install.packages("nnet"))
-
+if(!require("RCurl"))
+  (install.packages("RCurl"))
+if(!require("devtools"))
+  (install.packages("devtools"))
 
 ###Import Data
 RAW_DATA<-read.csv("Raw_Data.csv")
@@ -60,10 +63,16 @@ TRAIN<-DATA[train_idx,]
 TEST<-DATA[test_idx,]
 
 
-bestmod <- nnet(Productivity ~ H1+H2+Race, data = TEST, size = 2, rang = 0.5,
+
+bestmod <- nnet(Productivity~H1+H2+Race,data=TRAIN, size = 2, rang = 0.5,
                decay = 5e-4, maxit = 200)
+bestmod
+#import plot function from Github
+source_gist("https://gist.github.com/7471137")
 
-summary(bestmod)
 
 
+par(mar=numeric(4),mfrow=c(1,2),family='serif')
+plot(bestmod,nid=F)
+plot(bestmod)
 
