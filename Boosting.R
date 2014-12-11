@@ -38,6 +38,9 @@ rm(RAW_DATA)
 DATA$GF<-log(DATA$GF)
 DATA$H1<-log(DATA$H1)
 DATA$H2<-log(DATA$H2)
+levels_race<-levels(DATA$Race)
+DATA$Race<-as.numeric(DATA$Race)
+
 
 
 ####Split Train and Test
@@ -63,7 +66,7 @@ gbm1 <-
       n.trees=1000,                # number of trees
       shrinkage=0.05,              # shrinkage or learning rate,
       # 0.001 to 0.1 usually work
-      interaction.depth=3,         # 1: additive model, 2: two-way interactions, etc.
+      interaction.depth=1,         # 1: additive model, 2: two-way interactions, etc.
       bag.fraction = 0.5,          # subsampling fraction, 0.5 is probably best
       train.fraction = 0.5,        # fraction of data for training,
       # first train.fraction*N used for training
@@ -156,18 +159,17 @@ for(race in par_disp){
   #     ggtitle(paste("Decision Boundaries for",race,"Percent Correct=",correct,"%"))+facet_wrap(~Productivity,ncol=2)
   #   print(train_plot)
   
+  
   plot_dat<-melt(func,id=c("H1","H2","Race"))
   plot<-ggplot(data=plot_dat,aes(x=H1,y=H2,fill=value))+
     geom_tile()+
     stat_contour(data=plot_dat,aes(z=value))+
-    ggtitle(paste("Probability Distribution for",race,"Percent Correct=",correct,"%"))+
+    ggtitle(paste("Probability Distribution for",levels_race[race],"Percent Correct=",correct,"%"))+
     facet_wrap(~variable,ncol=2)
   print(plot)  
 }
 
-####if more iterations are desired
-gbm1 <- gbm.more(gbm1,1000,
-                 verbose=FALSE) # stop printing detailed progress
+
 
 
 
