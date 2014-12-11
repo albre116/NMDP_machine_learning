@@ -1,5 +1,7 @@
 ####################################################
 ####neural network approach
+####this approach will also do the L1-L2 regularized sparse vector machine
+####based upon kernel methods (should be roughly equivalent to SVM)
 ####################################################
 rm(list=ls())
 gc()
@@ -42,8 +44,7 @@ rm(RAW_DATA)
 DATA$GF<-log(DATA$GF)
 DATA$H1<-log(DATA$H1)
 DATA$H2<-log(DATA$H2)
-levels_race<-levels(DATA$Race)
-DATA$Race<-as.numeric(DATA$Race)
+
 
 
 
@@ -57,3 +58,12 @@ test_idx<-!logical
 rm(logical)
 TRAIN<-DATA[train_idx,]
 TEST<-DATA[test_idx,]
+
+
+bestmod <- nnet(Productivity ~ H1+H2+Race, data = TEST, size = 2, rang = 0.5,
+               decay = 5e-4, maxit = 200)
+
+summary(bestmod)
+
+
+
