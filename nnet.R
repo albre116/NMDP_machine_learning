@@ -27,6 +27,14 @@ if(!require("RCurl"))
   (install.packages("RCurl"))
 if(!require("devtools"))
   (install.packages("devtools"))
+if(!require("reshape"))
+  (install.packages("reshape"))
+if(!require("RSNNS"))
+  (install.packages("RSNNS"))
+if(!require("Rcpp"))
+  (install.packages("Rcpp"))
+if(!require("neuralnet"))
+  (install.packages("neuralnet"))
 
 ###Import Data
 RAW_DATA<-read.csv("Raw_Data.csv")
@@ -63,16 +71,49 @@ TRAIN<-DATA[train_idx,]
 TEST<-DATA[test_idx,]
 
 
+x<-TRAIN[c("H1","H2")]
+x<-cbind(x,decodeClassLabels(TRAIN[,c("Race")]))
+#x$intercept=1
+y<-TRAIN[c("Productivity")]
+y<-decodeClassLabels(y[,1])
+x_tst<-TEST[c("H1","H2")]
+x_tst<-cbind(x_tst,decodeClassLabels(TEST[,c("Race")]))
+#x_tst$intercept=1
+y_tst<-TEST[c("Productivity")]
+y_tst<-decodeClassLabels(y_tst[,1])
 
-bestmod <- nnet(Productivity~H1+H2+Race,data=TRAIN, size = 2, rang = 0.5,
-               decay = 5e-4, maxit = 200)
-bestmod
+bestmod <- mlp(x,y, size=c(3,5), learnFuncParams=c(0.1),
+             maxit=50)
+summary(bestmod)
+bestmod$snnsObject$getUnitDefinitions()
+weightMatrix(bestmod)
+extractNetInfo(bestmod)
+predictions <- predict(bestmod,x_tst)
+plotRegressionError(predictions[,2], y_tst[,2])
+confusionMatrix(y_tst,predictions)
+plotROC(predictions[,2],y_tst[,2])
+
+
+
 #import plot function from Github
-source_gist("https://gist.github.com/7471137")
+source_url('https://gist.githubusercontent.com/fawda123/7471137/raw/466c1474d0a505ff044412703516c34f1a4684a5/nnet_plot_update.r')
+
+plot.nnet(bestmod)
+plot.nnet(bestmod,nid=F)###don't show thickness
+plot.nnet(bestmod,wts.only=T)
+
+#import sensitivity analysis function
+source_url('https://gist.githubusercontent.com/fawda123/6860630/raw/b8bf4a6c88d6b392b1bfa6ef24759ae98f31877c/lek_fun.r')
+
+#sensitivity analsyis, note 'exp.in' argument
+lek.fun(bestmod,exp.in=x,var.sens=c("X1","X2"),
+        split.vals=c(0,.50,1))
 
 
 
-par(mar=numeric(4),mfrow=c(1,2),family='serif')
-plot(bestmod,nid=F)
-plot(bestmod)
+
+
+
+
+
 
