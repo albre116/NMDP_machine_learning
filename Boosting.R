@@ -108,8 +108,10 @@ par(mfrow=c(1,1))
 #plot(gbm1,1:3,best.iter)
 # do another 100 iterations
 
-
+#best.iter=1000
 bestmod<-gbm1
+
+
 ###Plot the linear fit
 ######Plot 2-D grid of Classification Rule
 create_grid<-function(x1,x2,n=1000){
@@ -163,10 +165,9 @@ for(race in par_disp){
   print(plot)  
 }
 
-
+####if more iterations are desired
 gbm1 <- gbm.more(gbm1,1000,
                  verbose=FALSE) # stop printing detailed progress
-
 
 
 
