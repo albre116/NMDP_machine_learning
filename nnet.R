@@ -1,7 +1,5 @@
 ####################################################
 ####neural network approach
-####this approach will also do the L1-L2 regularized sparse vector machine
-####based upon kernel methods (should be roughly equivalent to SVM)
 ####################################################
 rm(list=ls())
 gc()
@@ -56,6 +54,8 @@ DATA$GF<-log(DATA$GF)
 DATA$H1<-log(DATA$H1)
 DATA$H2<-log(DATA$H2)
 
+DATA[c("H1","H2","GF")]<-normalizeData(DATA[c("H1","H2","GF")],type="0_1")
+summary(DATA)
 
 ####Split Train and Test
 set.seed(1103)
@@ -81,7 +81,7 @@ y_tst<-decodeClassLabels(y_tst[,1])
 tmp_data<-splitForTrainingAndTest(x,y,ratio=0.3)
 
 
-parameterGrid <-  expand.grid(c(0,3),c(3,5,9,15), c(0.00316, 0.0147))
+parameterGrid <-  expand.grid(c(0,3),c(3,5,9,15), c(0.00316, 0.0147,0.1))
 colnames(parameterGrid) <-  c("nHidden_l1","nHidden_l2", "learnRate") 
 rownames(parameterGrid) <- paste("nnet-", apply(parameterGrid, 1, function(x) {paste(x,sep="", collapse="-")}), sep="") 
 models<-apply(parameterGrid, 1, function(p) { 
@@ -128,7 +128,7 @@ t(testErrors)
 trainErrors[which(min(trainErrors) == trainErrors)]
 testErrors[which(min(testErrors) == testErrors)]
 param_chosen<-which(min(testErrors) == testErrors)###you can change this to pick other models
-param_chosen<-11
+#param_chosen<-11
 p<-as.numeric(parameterGrid[param_chosen,])
 s<-p[c(1,2)]
 if(s[1]==0){s=s[2]}
@@ -188,7 +188,7 @@ race=par_disp[1]
   for(race in par_disp){
     idx<-as.logical(x_tst[,colnames(x_tst)==race])
     CUT_TEST<-x_tst[idx, ]
-    grid=data.frame(s_grid,CUT_TEST[1,colnames(CUT_TEST) %in% par_disp])
+    grid=data.frame(s_grid,CUT_TEST[1,colnames(CUT_TEST) %in% par_disp,drop=F])
     func=predict(bestmod,grid)
     colnames(func)<-colnames(y_tst)
     func<-data.frame(grid,func)

@@ -21,6 +21,20 @@ if(!require("reshape2"))
   (install.packages("reshape2"))
 if(!require("nnet"))
   (install.packages("nnet"))
+if(!require("RCurl"))
+  (install.packages("RCurl"))
+if(!require("devtools"))
+  (install.packages("devtools"))
+if(!require("reshape"))
+  (install.packages("reshape"))
+if(!require("RSNNS"))
+  (install.packages("RSNNS"))
+if(!require("Rcpp"))
+  (install.packages("Rcpp"))
+if(!require("neuralnet"))
+  (install.packages("neuralnet"))
+if(!require("glmnet"))
+  (install.packages("glmnet"))
 
 ###Import Data
 RAW_DATA<-read.csv("Raw_Data.csv")
@@ -41,7 +55,8 @@ rm(RAW_DATA)
 DATA$GF<-log(DATA$GF)
 DATA$H1<-log(DATA$H1)
 DATA$H2<-log(DATA$H2)
-
+DATA[c("H1","H2","GF")]<-normalizeData(DATA[c("H1","H2","GF")],type="0_1")
+summary(DATA)
 
 ####Split Train and Test
 set.seed(1103)
@@ -185,6 +200,88 @@ for(race in par_disp){
   #   print(train_plot)
   
   plot_dat<-melt(func,id=c("H1","H2","Race"))
+  plot<-ggplot(data=plot_dat,aes(x=H1,y=H2,fill=value))+
+    geom_tile()+
+    stat_contour(data=plot_dat,aes(z=value))+
+    ggtitle(paste("Probability Distribution for",race,"Percent Correct=",correct,"%"))+
+    facet_wrap(~variable,ncol=2)
+  print(plot)  
+}
+
+##########################################################################
+###Now apply a sparse vector machine (l1 & l2 regularized) 
+###that should perform similar to
+###the kernel based methods above
+###Use a penalized GLM fit to the data to pull out relevant kernel elements
+##########################################################################
+y=as.factor(as.character(TRAIN$Productivity))
+y_tst=as.factor(as.character(TEST$Productivity))
+x=as.matrix(TRAIN[c("H1","H2")])
+x<-cbind(x,decodeClassLabels(TRAIN[,c("Race")]))
+x_tst=as.matrix(TEST[c("H1","H2")])
+x_tst<-cbind(x_tst,decodeClassLabels(TEST[,c("Race")]))
+
+###fit kernel for the x matrix
+rbf<-rbfdot(sigma=0.05)
+kx<-kernelMatrix(rbf,x)
+kx_tst<-kernelMatrix(rbf,x_tst,x)
+fit<-glmnet(kx,y,family="multinomial")
+coef(fit)
+cvfit=cv.glmnet(kx,y,family="multinomial")
+plot(cvfit)
+preds<-predict(cvfit,newx=kx_tst,s="lambda.min",type="response")
+coef(cvfit,s="lambda.min")
+
+
+###Plot the linear fit
+######Plot 2-D grid of Classification Rule
+create_grid<-function(x1,x2,n=1000){
+  min_x1<-min(x1)
+  max_x1<-max(x1)
+  x1_seq<-seq(min_x1,max_x1,length.out=floor(sqrt(n)))
+  min_x2<-min(x2)
+  max_x2<-max(x2)
+  x2_seq<-seq(min_x2,max_x2,length.out=floor(sqrt(n)))
+  grid<-expand.grid(H1=x1_seq,H2=x2_seq)
+  return(grid)
+}
+
+s_grid<-create_grid(DATA$H1,DATA$H2,n=10000)
+
+par_disp<-unique(TRAIN$Race)
+race=par_disp[1]
+
+for(race in par_disp){
+  idx<-as.logical(x_tst[,colnames(x_tst)==race])
+  CUT_TEST<-x_tst[idx, ]
+  grid=data.frame(s_grid,CUT_TEST[1,colnames(CUT_TEST) %in% par_disp,drop=F])
+  grid<-as.matrix(grid)
+  grid<-kernelMatrix(rbf,grid,x)
+  func=predict(cvfit,newx=grid,s="lambda.min",type="response")
+  names<-colnames(func)
+  func<-matrix(func,ncol=ncol(func))
+  colnames(func)<-names
+  func<-data.frame(s_grid,func)
+  kx_tst<-kernelMatrix(rbf,CUT_TEST,x)
+  tmp=predict(cvfit,newx=kx_tst,s="lambda.min",type="response")
+  names<-colnames(tmp)
+  tmp<-matrix(tmp,ncol=ncol(tmp))
+  colnames(tmp)<-names
+  class<-apply(tmp,1,function(b){
+    which(b==max(b))
+  })
+  class<-colnames(tmp)[class]
+
+  response<-y_tst[idx]
+  concordance<-numeric(length(response))
+  
+  for (i in 1:nrow(CUT_TEST)){
+    concordance[i]=as.numeric(response[i] %in% class[i])                                   
+  }
+  correct<-round(mean(concordance),3)*100
+  
+  
+  plot_dat<-melt(func,id=c("H1","H2"))
   plot<-ggplot(data=plot_dat,aes(x=H1,y=H2,fill=value))+
     geom_tile()+
     stat_contour(data=plot_dat,aes(z=value))+

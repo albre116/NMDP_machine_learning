@@ -21,6 +21,18 @@ if(!require("reshape2"))
   (install.packages("reshape2"))
 if(!require("nnet"))
   (install.packages("nnet"))
+if(!require("RCurl"))
+  (install.packages("RCurl"))
+if(!require("devtools"))
+  (install.packages("devtools"))
+if(!require("reshape"))
+  (install.packages("reshape"))
+if(!require("RSNNS"))
+  (install.packages("RSNNS"))
+if(!require("Rcpp"))
+  (install.packages("Rcpp"))
+if(!require("neuralnet"))
+  (install.packages("neuralnet"))
 ###Import Data
 RAW_DATA<-read.csv("Raw_Data.csv")
 RAW_DATA$Frequency.1*RAW_DATA$Frequency.2
@@ -43,6 +55,8 @@ DATA$H2<-log(DATA$H2)
 levels_race<-levels(DATA$Race)
 DATA$Race<-as.numeric(DATA$Race)
 
+DATA[c("H1","H2","GF")]<-normalizeData(DATA[c("H1","H2","GF")],type="0_1")
+summary(DATA)
 
 
 ####Split Train and Test

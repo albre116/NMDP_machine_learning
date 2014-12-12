@@ -21,6 +21,18 @@ if(!require("reshape2"))
   (install.packages("reshape2"))
 if(!require("nnet"))
   (install.packages("nnet"))
+if(!require("RCurl"))
+  (install.packages("RCurl"))
+if(!require("devtools"))
+  (install.packages("devtools"))
+if(!require("reshape"))
+  (install.packages("reshape"))
+if(!require("RSNNS"))
+  (install.packages("RSNNS"))
+if(!require("Rcpp"))
+  (install.packages("Rcpp"))
+if(!require("neuralnet"))
+  (install.packages("neuralnet"))
 
 
 ###Import Data
@@ -41,7 +53,8 @@ rm(RAW_DATA)
 DATA$GF<-log(DATA$GF)
 DATA$H1<-log(DATA$H1)
 DATA$H2<-log(DATA$H2)
-
+DATA[c("H1","H2","GF")]<-normalizeData(DATA[c("H1","H2","GF")],type="0_1")
+summary(DATA)
 
 ####Split Train and Test
 set.seed(1103)
