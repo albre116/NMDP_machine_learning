@@ -128,12 +128,14 @@ t(testErrors)
 trainErrors[which(min(trainErrors) == trainErrors)]
 testErrors[which(min(testErrors) == testErrors)]
 param_chosen<-which(min(testErrors) == testErrors)###you can change this to pick other models
+param_chosen<-11
 p<-as.numeric(parameterGrid[param_chosen,])
 s<-p[c(1,2)]
 if(s[1]==0){s=s[2]}
 l<-p[3]
 bestmod<-mlp(x,y, size=s, learnFunc="Std_Backpropagation",
     learnFuncParams=c(l, 0.05), maxit=200)
+
 
 ####now that we have fixed a model we can cheat and look at the test error
 bestmod$snnsObject$getUnitDefinitions()
