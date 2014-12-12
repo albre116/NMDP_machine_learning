@@ -78,10 +78,10 @@ x_tst<-cbind(x_tst,decodeClassLabels(TEST[,c("Race")]))
 y_tst<-TEST[c("Productivity")]
 y_tst<-decodeClassLabels(y_tst[,1])
 
-tmp_data<-splitForTrainingAndTest(x,y,ratio=0.2)
+tmp_data<-splitForTrainingAndTest(x,y,ratio=0.3)
 
 
-parameterGrid <-  expand.grid(c(0,3),c(3,5,9,15), c(0.00316, 0.0147, 0.1))
+parameterGrid <-  expand.grid(c(0,3),c(3,5,9,15), c(0.00316, 0.0147))
 colnames(parameterGrid) <-  c("nHidden_l1","nHidden_l2", "learnRate") 
 rownames(parameterGrid) <- paste("nnet-", apply(parameterGrid, 1, function(x) {paste(x,sep="", collapse="-")}), sep="") 
 models<-apply(parameterGrid, 1, function(p) { 
@@ -89,7 +89,7 @@ models<-apply(parameterGrid, 1, function(p) {
   if(s[1]==0){s=s[2]}
   l<-p[3]
   mlp(tmp_data$inputsTrain, tmp_data$targetsTrain, size=s, learnFunc="Std_Backpropagation",
-      learnFuncParams=c(l, 0.05), maxit=200, inputsTest=tmp_data$inputsTest,
+      learnFuncParams=c(l, 0.1), maxit=200, inputsTest=tmp_data$inputsTest,
       targetsTest=tmp_data$targetsTest)
   })
 
