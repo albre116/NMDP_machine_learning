@@ -81,40 +81,59 @@ y_tst<-decodeClassLabels(y_tst[,1])
 tmp_data<-splitForTrainingAndTest(x,y,ratio=0.2)
 
 
-parameterGrid <-  expand.grid(c(3,5,9,15), c(0.00316, 0.0147, 0.1)) 
-colnames(parameterGrid) <-  c("nHidden", "learnRate") 
+parameterGrid <-  expand.grid(c(0,3),c(3,5,9,15), c(0.00316, 0.0147, 0.1))
+colnames(parameterGrid) <-  c("nHidden_l1","nHidden_l2", "learnRate") 
 rownames(parameterGrid) <- paste("nnet-", apply(parameterGrid, 1, function(x) {paste(x,sep="", collapse="-")}), sep="") 
 models<-apply(parameterGrid, 1, function(p) { 
-  mlp(tmp_data$inputsTrain, tmp_data$targetsTrain, size=p[1], learnFunc="Std_Backpropagation",
-      learnFuncParams=c(p[2], 0.05), maxit=200, inputsTest=tmp_data$inputsTest,
+  s<-p[c(1,2)]
+  if(s[1]==0){s=s[2]}
+  l<-p[3]
+  mlp(tmp_data$inputsTrain, tmp_data$targetsTrain, size=s, learnFunc="Std_Backpropagation",
+      learnFuncParams=c(l, 0.05), maxit=200, inputsTest=tmp_data$inputsTest,
       targetsTest=tmp_data$targetsTest)
   })
 
-par(mfrow=c(4,3)) 
+
+pp<-ceiling(sqrt(nrow(parameterGrid)))
+par(mfrow=c(pp,pp)) 
 for(modInd in 1:length(models)) { 
       plotIterativeError(models[[modInd]], main=names(models)[modInd]) 
     }
 
 par(op)
 
-
+###measure error using multinomial deviance as loss function
 trainErrors <-  data.frame(lapply(models, function(mod) {
-  error<-sqrt(sum((mod$fitted.values - tmp_data$targetsTrain)^2)) 
+  correct<-apply(tmp_data$targetsTrain,1,function(b){
+    which(b==1)
+  })
+  correct<-as.matrix(data.frame(1:length(correct),correct))
+  error<-sqrt(sum(-log(mod$fitted.values[correct]))) 
             error 
           })) 
+
+
 testErrors <-  data.frame(lapply(models, function(mod) { 
         pred <-  predict(mod,tmp_data$inputsTest) 
-        error <-  sqrt(sum((pred - tmp_data$targetsTest)^2)) 
+        correct<-apply(tmp_data$targetsTest,1,function(b){
+          which(b==1)
+        })
+        error<-sqrt(sum(-log(pred[correct]))) 
         error 
       })) 
 t(trainErrors)
 t(testErrors)
 
+
 trainErrors[which(min(trainErrors) == trainErrors)]
 testErrors[which(min(testErrors) == testErrors)]
-p<-as.numeric(parameterGrid[which(min(testErrors) == testErrors),])
-bestmod<-mlp(x,y, size=p[1], learnFunc="Std_Backpropagation",
-    learnFuncParams=c(p[2], 0.05), maxit=200)
+param_chosen<-which(min(testErrors) == testErrors)###you can change this to pick other models
+p<-as.numeric(parameterGrid[param_chosen,])
+s<-p[c(1,2)]
+if(s[1]==0){s=s[2]}
+l<-p[3]
+bestmod<-mlp(x,y, size=s, learnFunc="Std_Backpropagation",
+    learnFuncParams=c(l, 0.05), maxit=200)
 
 ####now that we have fixed a model we can cheat and look at the test error
 bestmod$snnsObject$getUnitDefinitions()
@@ -163,43 +182,43 @@ par_disp<-unique(TRAIN$Race)
 race=par_disp[1]
 
 ###look at the response surface after applying the softmax function
-
-for(race in par_disp){
-  idx<-as.logical(x_tst[,colnames(x_tst)==race])
-  CUT_TEST<-x_tst[idx, ]
-  grid=data.frame(s_grid,CUT_TEST[1,colnames(CUT_TEST) %in% par_disp])
-  func=predict(bestmod,grid)
-  colnames(func)<-colnames(y_tst)
-  func<-data.frame(grid,func)
-  tmp<-predict(bestmod,CUT_TEST)
-  colnames(tmp)<-colnames(y_tst)
-  class<-apply(tmp,1,function(b){
-    which(b==max(b))
-  })
-  class<-colnames(tmp)[class]
   
-  response<-apply(y_tst[idx,],1,function(b){
-    which(b==max(b))
-  })
-  response<-colnames(y_tst)[response]
-  concordance<-numeric(length(response))
-  
-  for (i in 1:nrow(CUT_TEST)){
-    concordance[i]=as.numeric(response[i] %in% class[i])                                   
+  for(race in par_disp){
+    idx<-as.logical(x_tst[,colnames(x_tst)==race])
+    CUT_TEST<-x_tst[idx, ]
+    grid=data.frame(s_grid,CUT_TEST[1,colnames(CUT_TEST) %in% par_disp])
+    func=predict(bestmod,grid)
+    colnames(func)<-colnames(y_tst)
+    func<-data.frame(grid,func)
+    tmp<-predict(bestmod,CUT_TEST)
+    colnames(tmp)<-colnames(y_tst)
+    class<-apply(tmp,1,function(b){
+      which(b==max(b))
+    })
+    class<-colnames(tmp)[class]
+    
+    response<-apply(y_tst[idx,],1,function(b){
+      which(b==max(b))
+    })
+    response<-colnames(y_tst)[response]
+    concordance<-numeric(length(response))
+    
+    for (i in 1:nrow(CUT_TEST)){
+      concordance[i]=as.numeric(response[i] %in% class[i])                                   
+    }
+    correct<-round(mean(concordance),3)*100
+    
+    
+    plot_dat<-melt(func,id=c("H1","H2","AFA","API","CAU","HIS","UNK"))
+    plot<-ggplot(data=plot_dat,aes(x=H1,y=H2,fill=value))+
+      geom_tile()+
+      stat_contour(data=plot_dat,aes(z=value))+
+      ggtitle(paste("Probability Distribution for",race,"Percent Correct=",correct,"%"))+
+      facet_wrap(~variable,ncol=2)
+    print(plot)  
   }
-  correct<-round(mean(concordance),3)*100
   
   
-  plot_dat<-melt(func,id=c("H1","H2","AFA","API","CAU","HIS","UNK"))
-  plot<-ggplot(data=plot_dat,aes(x=H1,y=H2,fill=value))+
-    geom_tile()+
-    stat_contour(data=plot_dat,aes(z=value))+
-    ggtitle(paste("Probability Distribution for",race,"Percent Correct=",correct,"%"))+
-    facet_wrap(~variable,ncol=2)
-  print(plot)  
-}
-
-
 
 
 
