@@ -222,14 +222,29 @@ x_tst=as.matrix(TEST[c("H1","H2")])
 x_tst<-cbind(x_tst,decodeClassLabels(TEST[,c("Race")]))
 
 ###fit kernel for the x matrix
-rbf<-rbfdot(sigma=0.05)
+models<-list()
+param<-c(0.01,0.05,0.25)
+for(i in 1:length(param)){
+print(paste("on loop",i))
+rbf<-rbfdot(sigma=param[i])
 kx<-kernelMatrix(rbf,x)
 kx_tst<-kernelMatrix(rbf,x_tst,x)
-fit<-glmnet(kx,y,family="multinomial")
-coef(fit)
+# fit<-glmnet(kx,y,family="multinomial")
+# coef(fit)
 cvfit=cv.glmnet(kx,y,family="multinomial")
-plot(cvfit)
-preds<-predict(cvfit,newx=kx_tst,s="lambda.min",type="response")
+models[[i]]<-cvfit
+}
+
+win<-ceiling(sqrt(length(param)))
+par(mfrow=c(win,win))
+lapply(models,function(b){plot(b)})
+cv_result<-lapply(models,function(b){min(b$cvm)})
+cv_result<-data.frame("lambda"=param,"Min Deviance"=unlist(cv_result))
+print(cv_result)
+cvfit<-models[[which(cv_result$Min.Deviance==min(cv_result$Min.Deviance))]]
+par(op)
+
+#preds<-predict(cvfit,newx=kx_tst,s="lambda.min",type="response")
 coef(cvfit,s="lambda.min")
 
 
