@@ -71,25 +71,60 @@ TEST<-DATA[test_idx,]
 
 x<-TRAIN[c("H1","H2")]
 x<-cbind(x,decodeClassLabels(TRAIN[,c("Race")]))
-#x$intercept=1
 y<-TRAIN[c("Productivity")]
 y<-decodeClassLabels(y[,1])
 x_tst<-TEST[c("H1","H2")]
 x_tst<-cbind(x_tst,decodeClassLabels(TEST[,c("Race")]))
-#x_tst$intercept=1
 y_tst<-TEST[c("Productivity")]
 y_tst<-decodeClassLabels(y_tst[,1])
 
-bestmod <- mlp(x,y, size=c(3,5), learnFuncParams=c(0.1),
-             maxit=50)
-summary(bestmod)
+tmp_data<-splitForTrainingAndTest(x,y,ratio=0.2)
+
+
+parameterGrid <-  expand.grid(c(3,5,9,15), c(0.00316, 0.0147, 0.1)) 
+colnames(parameterGrid) <-  c("nHidden", "learnRate") 
+rownames(parameterGrid) <- paste("nnet-", apply(parameterGrid, 1, function(x) {paste(x,sep="", collapse="-")}), sep="") 
+models<-apply(parameterGrid, 1, function(p) { 
+  mlp(tmp_data$inputsTrain, tmp_data$targetsTrain, size=p[1], learnFunc="Std_Backpropagation",
+      learnFuncParams=c(p[2], 0.05), maxit=200, inputsTest=tmp_data$inputsTest,
+      targetsTest=tmp_data$targetsTest)
+  })
+
+par(mfrow=c(4,3)) 
+for(modInd in 1:length(models)) { 
+      plotIterativeError(models[[modInd]], main=names(models)[modInd]) 
+    }
+
+par(op)
+
+
+trainErrors <-  data.frame(lapply(models, function(mod) {
+  error<-sqrt(sum((mod$fitted.values - tmp_data$targetsTrain)^2)) 
+            error 
+          })) 
+testErrors <-  data.frame(lapply(models, function(mod) { 
+        pred <-  predict(mod,tmp_data$inputsTest) 
+        error <-  sqrt(sum((pred - tmp_data$targetsTest)^2)) 
+        error 
+      })) 
+t(trainErrors)
+t(testErrors)
+
+trainErrors[which(min(trainErrors) == trainErrors)]
+testErrors[which(min(testErrors) == testErrors)]
+p<-as.numeric(parameterGrid[which(min(testErrors) == testErrors),])
+bestmod<-mlp(x,y, size=p[1], learnFunc="Std_Backpropagation",
+    learnFuncParams=c(p[2], 0.05), maxit=200)
+
+####now that we have fixed a model we can cheat and look at the test error
 bestmod$snnsObject$getUnitDefinitions()
 weightMatrix(bestmod)
 extractNetInfo(bestmod)
+plotIterativeError(bestmod)
 predictions <- predict(bestmod,x_tst)
-plotRegressionError(predictions[,2], y_tst[,2])
+plotRegressionError(predictions[,4], y_tst[,4])
 confusionMatrix(y_tst,predictions)
-plotROC(predictions[,2],y_tst[,2])
+plotROC(predictions[,4],y_tst[,4])
 
 
 
@@ -97,7 +132,7 @@ plotROC(predictions[,2],y_tst[,2])
 source_url('https://gist.githubusercontent.com/fawda123/7471137/raw/466c1474d0a505ff044412703516c34f1a4684a5/nnet_plot_update.r')
 
 plot.nnet(bestmod)
-plot.nnet(bestmod,nid=F)###don't show thickness
+#plot.nnet(bestmod,nid=F)###don't show thickness
 plot.nnet(bestmod,wts.only=T)
 
 #import sensitivity analysis function
