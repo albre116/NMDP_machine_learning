@@ -158,7 +158,6 @@ for(race in par_disp){
 bestmod<-gausspr(Productivity~H1+H2+Race,data=TRAIN,kernel="rbfdot",
               kpar="automatic")
 
-
 ###Plot the linear fit
 ######Plot 2-D grid of Classification Rule
 create_grid<-function(x1,x2,n=1000){
@@ -305,6 +304,92 @@ for(race in par_disp){
   print(plot)  
 }
 
+
+
+
+##########################################################################
+#####Now Apply a custom kernel to the data
+#####Using a SNP variant type data Set
+#####Only for example
+##########################################################################
+source("gausspr_mod.R")
+
+knew<-function (scale=0.001) 
+{
+  rval <- function(x, y = NULL) {
+    if (!is(x, "vector")) 
+      stop("x must be a vector")
+    if (!is(y, "vector") && !is.null(y)) 
+      stop("y must a vector")
+    if (is(x, "vector") && is.null(y)) {
+      return(1)
+    }
+    if (is(x, "vector") && is(y, "vector")) {
+      if (!length(x) == length(y)) 
+        stop("number of dimension must be the same on both data points")
+      return((sum(x*y) +1)*exp(-scale*sum((x-y)^2)))
+    }
+  }
+  return(new("kernel", .Data = rval, kpar = list(scale = scale)))
+}
+
+
+k<-knew()
+
+
+bestmod<-gausspr_mod(Productivity~H1+H2+Race,data=TRAIN,kernel=k)
+
+
+
+
+###Plot the linear fit
+######Plot 2-D grid of Classification Rule
+create_grid<-function(x1,x2,n=1000){
+  min_x1<-min(x1)
+  max_x1<-max(x1)
+  x1_seq<-seq(min_x1,max_x1,length.out=floor(sqrt(n)))
+  min_x2<-min(x2)
+  max_x2<-max(x2)
+  x2_seq<-seq(min_x2,max_x2,length.out=floor(sqrt(n)))
+  grid<-expand.grid(H1=x1_seq,H2=x2_seq)
+  return(grid)
+}
+
+grid<-create_grid(DATA$H1,DATA$H2,n=10000)
+
+
+par_disp<-unique(TRAIN$Race)
+race=par_disp[1]
+
+
+for(race in par_disp){
+  CUT_TEST<-TEST[TEST$Race==race, ]
+  grid$Race=CUT_TEST$Race[1]
+  func=predict(bestmod,newdata = grid,type ="probabilities" )
+  func<-data.frame(grid,func)
+  class<-predict(bestmod,newdata=CUT_TEST)
+  concordance<-numeric(length(class))
+  for (i in 1:nrow(CUT_TEST)){
+    concordance[i]=as.numeric(CUT_TEST$Productivity[i] %in% class[i])                                   
+  }
+  correct<-round(mean(concordance),3)*100
+  
+  #   base_layer<-ggplot(data=grid,aes(x=H1,y=H2,colour=class))+
+  #     ggtitle(paste("Decision Boundaries, Race=",race))+
+  #     geom_point(size=3.5,alpha=1,shape=15)
+  #   
+  #   train_plot<-base_layer+geom_text(data=CUT_TEST,aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
+  #     ggtitle(paste("Decision Boundaries for",race,"Percent Correct=",correct,"%"))+facet_wrap(~Productivity,ncol=2)
+  #   print(train_plot)
+  
+  plot_dat<-melt(func,id=c("H1","H2","Race"))
+  plot<-ggplot(data=plot_dat,aes(x=H1,y=H2,fill=value))+
+    geom_tile()+
+    stat_contour(data=plot_dat,aes(z=value))+
+    ggtitle(paste("Probability Distribution for",race,"Percent Correct=",correct,"%"))+
+    facet_wrap(~variable,ncol=2)
+  print(plot)  
+}
 
 
 
