@@ -1,8 +1,9 @@
 ## Gaussian Processes implementation. Laplace approximation for classification.
 ## author : alexandros karatzoglou
 
-setGeneric("gausspr", function(x, ...) standardGeneric("gausspr"))
-setMethod("gausspr",signature(x="formula"),
+setClass("gausspr_mod",contains="gausspr")
+setGeneric("gausspr_mod", function(x, ...) standardGeneric("gausspr_mod"))
+setMethod("gausspr_mod",signature(x="formula"),
 function (x, data=NULL, ..., subset, na.action = na.omit, scaled = TRUE){
   cl <- match.call()
   m <- match.call(expand.dots = FALSE)
@@ -28,7 +29,7 @@ function (x, data=NULL, ..., subset, na.action = na.omit, scaled = TRUE){
     scaled <- !attr(x, "assign") %in% remove
   }
   
-  ret <- gausspr(x, y, scaled = scaled, ...)
+  ret <- gausspr_mod(x, y, scaled = scaled, ...)
   kcall(ret) <- cl
   terms(ret) <- Terms
   if (!is.null(attr(m, "na.action")))
@@ -36,15 +37,15 @@ function (x, data=NULL, ..., subset, na.action = na.omit, scaled = TRUE){
   return (ret)
 })
 
-setMethod("gausspr",signature(x="vector"),
+setMethod("gausspr_mod",signature(x="vector"),
 function(x,...)
   {
     x <- t(t(x))
-    ret <- gausspr(x, ...)
+    ret <- gausspr_mod(x, ...)
     ret
   })
     
-setMethod("gausspr",signature(x="matrix"),
+setMethod("gausspr_mod",signature(x="matrix"),
 function (x,
           y,
           scaled    = TRUE, 
@@ -64,7 +65,7 @@ function (x,
 ## should become an option
   reduced <- FALSE
 ## subsetting and na-handling for matrices
-  ret <- new("gausspr")
+  ret <- new("gausspr_mod")
   if (!missing(subset)) x <- x[subset,]
   if (is.null(y))
     x <- na.action(x)
@@ -279,13 +280,13 @@ if(is.character(kernel)){
           cind <- unsplit(vgr[-i],factor(rep((1:cross)[-i],unlist(lapply(vgr[-i],length)))))
           if(type(ret)=="classification")
             {
-              cret <- gausspr(x[cind,], y[cind], scaled = FALSE, type=type(ret),kernel=kernel,C=C,var = var, cross = 0, fit = FALSE)
+              cret <- gausspr_mod(x[cind,], y[cind], scaled = FALSE, type=type(ret),kernel=kernel,C=C,var = var, cross = 0, fit = FALSE)
                cres <- predict(cret, x[vgr[[i]],])
             cerror <- (1 - .classAgreement(table(y[vgr[[i]]],as.integer(cres))))/cross + cerror
             }
           if(type(ret)=="regression")
             {
-              cret <- gausspr(x[cind,],y[cind],type=type(ret),scaled = FALSE, kernel=kernel,var = var,tol=tol, cross = 0, fit = FALSE)
+              cret <- gausspr_mod(x[cind,],y[cind],type=type(ret),scaled = FALSE, kernel=kernel,var = var,tol=tol, cross = 0, fit = FALSE)
               cres <- predict(cret, x[vgr[[i]],])
               if (!is.null(scaling(ret)$y.scale))
                 scal <- scaling(ret)$y.scale$"scaled:scale"
@@ -301,7 +302,7 @@ if(is.character(kernel)){
 })
 
 
-setMethod("predict", signature(object = "gausspr"),
+setMethod("predict", signature(object = "gausspr_mod"),
 function (object, newdata, type = "response", coupler = "minpair")
 {
   sc <- 0
@@ -424,9 +425,9 @@ function (object, newdata, type = "response", coupler = "minpair")
 })
 
 
-setMethod("show","gausspr",
+setMethod("show","gausspr_mod",
 function(object){
-  cat("Gaussian Processes object of class \"gausspr\"","\n")
+  cat("Gaussian Processes object of class \"gausspr_mod\"","\n")
   cat(paste("Problem type:", type(object),"\n"))
   cat("\n")
   show(kernelf(object))
