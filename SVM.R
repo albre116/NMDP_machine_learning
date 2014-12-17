@@ -37,14 +37,19 @@ if(!require("neuralnet"))
 
 ###Import Data
 RAW_DATA<-read.csv("Raw_Data.csv")
-RAW_DATA$Frequency.1*RAW_DATA$Frequency.2
+RAW_DATA$Productivity.Group<-as.character(RAW_DATA$Productivity.Group)
+RAW_DATA$Productivity.Group[ RAW_DATA$Productivity.Group=="B"]="A"
+RAW_DATA$Productivity.Group[ RAW_DATA$Productivity.Group=="C"]="B"
+RAW_DATA$Productivity.Group[ RAW_DATA$Productivity.Group=="D"]="C"
+
+
 permute<-rbinom(nrow(RAW_DATA),1,prob=0.5)==1
 RAW_DATA[permute,]<-RAW_DATA[permute,c(1:6,8,7,10,9,11:13)]
 DATA<-RAW_DATA[c("RID","Race","Frequency.1",
                  "Frequency.2","Rank.1","Rank.2",
                  "Total.Genotype.Frequency","Productivity.Group")]
 
-DATA$Productivity.Group<-ordered(DATA$Productivity.Group,levels=c("D","C","B","A"))
+DATA$Productivity.Group<-ordered(DATA$Productivity.Group,levels=c("C","B","A"))
 colnames(DATA)<-c("RID","Race","H1","H2","Rank_H1","Rank_H2","GF","Productivity")
 DATA<-DATA[complete.cases(DATA),]###remove NA's
 DATA<-DATA[DATA$GF!=0 & DATA$H1!=0 & DATA$H2!=0,]
@@ -67,7 +72,6 @@ test_idx<-!logical
 rm(logical)
 TRAIN<-DATA[train_idx,]
 TEST<-DATA[test_idx,]
-
 
 ######Fit a simple SVM using the e1071 package
 weights<-table(TRAIN$Productivity)/nrow(TRAIN)

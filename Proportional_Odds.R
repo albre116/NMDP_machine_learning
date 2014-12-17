@@ -37,13 +37,19 @@ if(!require("neuralnet"))
 
 ###Import Data
 RAW_DATA<-read.csv("Raw_Data.csv")
+RAW_DATA$Productivity.Group<-as.character(RAW_DATA$Productivity.Group)
+RAW_DATA$Productivity.Group[ RAW_DATA$Productivity.Group=="B"]="A"
+RAW_DATA$Productivity.Group[ RAW_DATA$Productivity.Group=="C"]="B"
+RAW_DATA$Productivity.Group[ RAW_DATA$Productivity.Group=="D"]="C"
+
+
 permute<-rbinom(nrow(RAW_DATA),1,prob=0.5)==1
 RAW_DATA[permute,]<-RAW_DATA[permute,c(1:6,8,7,10,9,11:13)]
 DATA<-RAW_DATA[c("RID","Race","Frequency.1",
                  "Frequency.2","Rank.1","Rank.2",
                  "Total.Genotype.Frequency","Productivity.Group")]
 
-DATA$Productivity.Group<-ordered(DATA$Productivity.Group,levels=c("D","C","B","A"))
+DATA$Productivity.Group<-ordered(DATA$Productivity.Group,levels=c("C","B","A"))
 colnames(DATA)<-c("RID","Race","H1","H2","Rank_H1","Rank_H2","GF","Productivity")
 DATA<-DATA[complete.cases(DATA),]###remove NA's
 DATA<-DATA[DATA$GF!=0 & DATA$H1!=0 & DATA$H2!=0,]
@@ -87,8 +93,8 @@ pi_preds<-as.data.frame(predict(fit,newdata=data.frame("GF"=geno_values,"Race"=r
                                 type="probs"))
 
 #calculate cutoff values
-Cutoff<-array(3)
-for(i in 1:3){
+Cutoff<-array(2)
+for(i in 1:2){
   CUT<-array(1:10000)
   for(j in 1:10000){
     CUT[j]=pi_preds[j,i+1]>pi_preds[j,i]}
@@ -111,16 +117,15 @@ print(round(mean(concordance),3))
 
 correct<-round(mean(concordance),3)*100
 
-plot(pi_preds$D~geno_values,ylim=c(0,1),type="l",lwd=2,
+plot(pi_preds$C~geno_values,ylim=c(0,1),type="l",lwd=2,
      ylab="Membership Probability",xlab="log(Genotype Frequency)")
 title(main=paste0("Test Data Model Fit: ",correct,"% concordant ",race),cex.main=.8)
-lines(pi_preds$C~geno_values,lwd=2,lty=2)
-lines(pi_preds$B~geno_values,lwd=2,lty=3)
-lines(pi_preds$A~geno_values,lwd=2,lty=4)
-legend("topleft",legend=c("Group D","Group C","Group B", "Group A"),lty=c(1:4),lwd=2,cex=.7)
+lines(pi_preds$B~geno_values,lwd=2,lty=2)
+lines(pi_preds$A~geno_values,lwd=2,lty=3)
+legend("topleft",legend=c("Group C","Group B", "Group A"),lty=c(1:3),lwd=2,cex=.7)
 abline(v=Cutoff[1])
 abline(v=Cutoff[2])
-abline(v=Cutoff[3])
+
 
 y<-as.numeric(CUT_TEST$Productivity)/4
 x<-CUT_TEST$GF
