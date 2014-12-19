@@ -1,90 +1,7 @@
 ####################################################
 ####More General Kernel Method Approaches
 ####################################################
-rm(list=ls())
-gc()
-graphics.off()
-op<-par()
-if(!require("MASS"))
-  (install.packages("MASS"))
-if(!require("ggplot2"))
-  (install.packages("ggplot2"))
-if(!require("kernlab"))
-  (install.packages("kernlab"))
-if(!require("e1071"))
-  (install.packages("e1071"))
-if(!require("gbm"))
-  (install.packages("gbm"))
-if(!require("dplyr"))
-  (install.packages("dplyr"))
-if(!require("reshape2"))
-  (install.packages("reshape2"))
-if(!require("nnet"))
-  (install.packages("nnet"))
-if(!require("RCurl"))
-  (install.packages("RCurl"))
-if(!require("devtools"))
-  (install.packages("devtools"))
-if(!require("reshape"))
-  (install.packages("reshape"))
-if(!require("RSNNS"))
-  (install.packages("RSNNS"))
-if(!require("Rcpp"))
-  (install.packages("Rcpp"))
-if(!require("neuralnet"))
-  (install.packages("neuralnet"))
-
-
-###Import Data
-RAW_DATA<-read.csv("Raw_Data.csv")
-RAW_DATA$Productivity.Group<-as.character(RAW_DATA$Productivity.Group)
-RAW_DATA$Productivity.Group[ RAW_DATA$Productivity.Group=="B"]="A"
-RAW_DATA$Productivity.Group[ RAW_DATA$Productivity.Group=="C"]="B"
-RAW_DATA$Productivity.Group[ RAW_DATA$Productivity.Group=="D"]="C"
-
-
-min_thresh<-min(RAW_DATA$Total.Genotype.Frequency[ RAW_DATA$Total.Genotype.Frequency!=0],na.rm=T)
-RAW_DATA$Total.Genotype.Frequency[ RAW_DATA$Total.Genotype.Frequency==0]<-min_thresh
-RAW_DATA$Total.Genotype.Frequency[ is.na(RAW_DATA$Total.Genotype.Frequency)]=min_thresh
-
-min_thresh<-min(RAW_DATA$Frequency.1[ RAW_DATA$Frequency.1!=0],na.rm=T)
-RAW_DATA$Frequency.1[ RAW_DATA$Frequency.1==0]<-min_thresh
-RAW_DATA$Frequency.1[ is.na(RAW_DATA$Frequency.1)]=min_thresh
-
-min_thresh<-min(RAW_DATA$Frequency.2[ RAW_DATA$Frequency.2!=0],na.rm=T)
-RAW_DATA$Frequency.2[ RAW_DATA$Frequency.2==0]<-min_thresh
-RAW_DATA$Frequency.2[ is.na(RAW_DATA$Frequency.2)]=min_thresh
-
-
-permute<-rbinom(nrow(RAW_DATA),1,prob=0.5)==1
-RAW_DATA[permute,]<-RAW_DATA[permute,c(1:6,8,7,10,9,11:13)]
-DATA<-RAW_DATA[c("RID","Race","Frequency.1",
-                 "Frequency.2","Rank.1","Rank.2",
-                 "Total.Genotype.Frequency","Productivity.Group")]
-
-DATA$Productivity.Group<-ordered(DATA$Productivity.Group,levels=c("C","B","A"))
-colnames(DATA)<-c("RID","Race","H1","H2","Rank_H1","Rank_H2","GF","Productivity")
-DATA<-DATA[complete.cases(DATA),]###remove NA's
-DATA<-DATA[DATA$GF!=0 & DATA$H1!=0 & DATA$H2!=0,]
-rm(RAW_DATA)
-
-###Format Predictors to be ln-scale
-DATA$GF<-log(DATA$GF)
-DATA$H1<-log(DATA$H1)
-DATA$H2<-log(DATA$H2)
-DATA[c("H1","H2","GF")]<-normalizeData(DATA[c("H1","H2","GF")],type="0_1")
-summary(DATA)
-
-####Split Train and Test
-set.seed(1103)
-train_idx<-sample(1:nrow(DATA),floor(nrow(DATA)*0.5))
-logical<-rep(FALSE,nrow(DATA))
-logical[train_idx]<-TRUE
-train_idx<-logical
-test_idx<-!logical
-rm(logical)
-TRAIN<-DATA[train_idx,]
-TEST<-DATA[test_idx,]
+source("data_prep.R")
 
 #####fit a ksvm kernel to output class probabilities (versus call)
 ######Fit a simple SVM using the e1071 package
@@ -166,6 +83,213 @@ for(race in par_disp){
 
 
 
+
+
+##########################################################################
+###Now apply a sparse vector machine (l1 & l2 regularized) 
+###that should perform similar to
+###the kernel based methods above
+###Use a penalized GLM fit to the data to pull out relevant kernel elements
+##########################################################################
+y=as.factor(as.character(TRAIN$Productivity))
+y_tst=as.factor(as.character(TEST$Productivity))
+x=as.matrix(TRAIN[c("H1","H2")])
+x<-cbind(x,decodeClassLabels(TRAIN[,c("Race")]))
+x_tst=as.matrix(TEST[c("H1","H2")])
+x_tst<-cbind(x_tst,decodeClassLabels(TEST[,c("Race")]))
+
+###fit kernel for the x matrix
+models<-list()
+param<-c(0.25,1,1.5)
+for(i in 1:length(param)){
+  print(paste("on loop",i))
+  rbf<-rbfdot(sigma=param[i])
+  kx<-kernelMatrix(rbf,x)
+  kx_tst<-kernelMatrix(rbf,x_tst,x)
+  # fit<-glmnet(kx,y,family="multinomial")
+  # coef(fit)
+  cvfit=cv.glmnet(kx,y,family="multinomial")
+  models[[i]]<-cvfit
+}
+
+win<-ceiling(sqrt(length(param)))
+par(mfrow=c(win,win))
+lapply(models,function(b){plot(b)})
+cv_result<-lapply(models,function(b){min(b$cvm)})
+cv_result<-data.frame("lambda"=param,"Min Deviance"=unlist(cv_result))
+print(cv_result)
+cvfit<-models[[which(cv_result$Min.Deviance==min(cv_result$Min.Deviance))]]
+par(op)
+
+#preds<-predict(cvfit,newx=kx_tst,s="lambda.min",type="response")
+coef(cvfit,s="lambda.min")
+
+
+###Plot the linear fit
+######Plot 2-D grid of Classification Rule
+create_grid<-function(x1,x2,n=1000){
+  min_x1<-min(x1)
+  max_x1<-max(x1)
+  x1_seq<-seq(min_x1,max_x1,length.out=floor(sqrt(n)))
+  min_x2<-min(x2)
+  max_x2<-max(x2)
+  x2_seq<-seq(min_x2,max_x2,length.out=floor(sqrt(n)))
+  grid<-expand.grid(H1=x1_seq,H2=x2_seq)
+  return(grid)
+}
+
+s_grid<-create_grid(DATA$H1,DATA$H2,n=10000)
+
+par_disp<-unique(TRAIN$Race)
+race=par_disp[1]
+
+for(race in par_disp){
+  idx<-as.logical(x_tst[,colnames(x_tst)==race])
+  CUT_TEST<-x_tst[idx, ]
+  grid=data.frame(s_grid,CUT_TEST[1,colnames(CUT_TEST) %in% par_disp,drop=F])
+  grid<-as.matrix(grid)
+  grid<-kernelMatrix(rbf,grid,x)
+  func=predict(cvfit,newx=grid,s="lambda.min",type="response")
+  names<-colnames(func)
+  func<-matrix(func,ncol=ncol(func))
+  colnames(func)<-names
+  func<-data.frame(s_grid,func)
+  kx_tst<-kernelMatrix(rbf,CUT_TEST,x)
+  tmp=predict(cvfit,newx=kx_tst,s="lambda.min",type="response")
+  names<-colnames(tmp)
+  tmp<-matrix(tmp,ncol=ncol(tmp))
+  colnames(tmp)<-names
+  class<-apply(tmp,1,function(b){
+    which(b==max(b))
+  })
+  class<-colnames(tmp)[class]
+  
+  response<-y_tst[idx]
+  concordance<-numeric(length(response))
+  
+  for (i in 1:nrow(CUT_TEST)){
+    concordance[i]=as.numeric(response[i] %in% class[i])                                   
+  }
+  correct<-round(mean(concordance),3)*100
+  
+  
+  plot_dat<-melt(func,id=c("H1","H2"))
+  plot<-ggplot(data=plot_dat,aes(x=H1,y=H2,fill=value))+
+    geom_tile()+
+    stat_contour(data=plot_dat,aes(z=value))+
+    ggtitle(paste("Probability Distribution for",race,"Percent Correct=",correct,"%"))+
+    facet_wrap(~variable,ncol=2)
+  print(plot)  
+}
+
+
+
+
+##########################################################################
+###Apply an elastic net penalty for multiple regression to the
+###To the continous response
+###So that we can do multiple regression on Y
+##########################################################################
+y=TRAIN[c("ten_of_tens","nine_of_tens")]
+y_tst=TEST[c("ten_of_tens","nine_of_tens")]
+x=as.matrix(TRAIN[c("H1","H2")])
+x<-cbind(x,decodeClassLabels(TRAIN[,c("Race")]))
+x_tst=as.matrix(TEST[c("H1","H2")])
+x_tst<-cbind(x_tst,decodeClassLabels(TEST[,c("Race")]))
+
+###look at structure of Y's to confirm association
+plot(ten_of_tens~nine_of_tens,data=y)
+
+
+###fit kernel for the x matrix
+models<-list()
+param<-c(0.25,1,1.5)
+for(i in 1:length(param)){
+  print(paste("on loop",i))
+  rbf<-rbfdot(sigma=param[i])
+  kx<-kernelMatrix(rbf,x)
+  kx_tst<-kernelMatrix(rbf,x_tst,x)
+  cvfit=glmnet(kx,y,family="mgaussian")###x-fold doesn't work, but no big deal
+  #cvfit=cv.glmnet(kx,y,family="mgaussian")
+  models[[i]]<-cvfit
+}
+
+win<-ceiling(sqrt(length(param)))
+par(mfrow=c(win,win))
+lapply(models,function(b){plot(b)})
+cv_result<-lapply(models,function(b){min(b$cvm)})
+cv_result<-data.frame("lambda"=param,"Min Deviance"=unlist(cv_result))
+print(cv_result)
+cvfit<-models[[which(cv_result$Min.Deviance==min(cv_result$Min.Deviance))]]
+par(op)
+
+#preds<-predict(cvfit,newx=kx_tst,s="lambda.min",type="response")
+coef(cvfit,s="lambda.min")
+
+
+###Plot the linear fit
+######Plot 2-D grid of Classification Rule
+create_grid<-function(x1,x2,n=1000){
+  min_x1<-min(x1)
+  max_x1<-max(x1)
+  x1_seq<-seq(min_x1,max_x1,length.out=floor(sqrt(n)))
+  min_x2<-min(x2)
+  max_x2<-max(x2)
+  x2_seq<-seq(min_x2,max_x2,length.out=floor(sqrt(n)))
+  grid<-expand.grid(H1=x1_seq,H2=x2_seq)
+  return(grid)
+}
+
+s_grid<-create_grid(DATA$H1,DATA$H2,n=10000)
+
+par_disp<-unique(TRAIN$Race)
+race=par_disp[1]
+
+for(race in par_disp){
+  idx<-as.logical(x_tst[,colnames(x_tst)==race])
+  CUT_TEST<-x_tst[idx, ]
+  grid=data.frame(s_grid,CUT_TEST[1,colnames(CUT_TEST) %in% par_disp,drop=F])
+  grid<-as.matrix(grid)
+  grid<-kernelMatrix(rbf,grid,x)
+  func=predict(cvfit,newx=grid,s="lambda.min",type="response")
+  names<-colnames(func)
+  func<-matrix(func,ncol=ncol(func))
+  colnames(func)<-names
+  func<-data.frame(s_grid,func)
+  kx_tst<-kernelMatrix(rbf,CUT_TEST,x)
+  tmp=predict(cvfit,newx=kx_tst,s="lambda.min",type="response")
+  names<-colnames(tmp)
+  tmp<-matrix(tmp,ncol=ncol(tmp))
+  colnames(tmp)<-names
+  class<-apply(tmp,1,function(b){
+    which(b==max(b))
+  })
+  class<-colnames(tmp)[class]
+  
+  response<-y_tst[idx]
+  concordance<-numeric(length(response))
+  
+  for (i in 1:nrow(CUT_TEST)){
+    concordance[i]=as.numeric(response[i] %in% class[i])                                   
+  }
+  correct<-round(mean(concordance),3)*100
+  
+  
+  plot_dat<-melt(func,id=c("H1","H2"))
+  plot<-ggplot(data=plot_dat,aes(x=H1,y=H2,fill=value))+
+    geom_tile()+
+    stat_contour(data=plot_dat,aes(z=value))+
+    ggtitle(paste("Probability Distribution for",race,"Percent Correct=",correct,"%"))+
+    facet_wrap(~variable,ncol=2)
+  print(plot)  
+}
+
+
+
+
+
+
+
 ##########################################################################
 #####Now Apply a gaussian Process to the data using RBF kernel
 #####This has a natural probabilisitc interpretation that SVM doesn't have
@@ -222,105 +346,6 @@ for(race in par_disp){
     facet_wrap(~variable,ncol=2)
   print(plot)  
 }
-
-##########################################################################
-###Now apply a sparse vector machine (l1 & l2 regularized) 
-###that should perform similar to
-###the kernel based methods above
-###Use a penalized GLM fit to the data to pull out relevant kernel elements
-##########################################################################
-y=as.factor(as.character(TRAIN$Productivity))
-y_tst=as.factor(as.character(TEST$Productivity))
-x=as.matrix(TRAIN[c("H1","H2")])
-x<-cbind(x,decodeClassLabels(TRAIN[,c("Race")]))
-x_tst=as.matrix(TEST[c("H1","H2")])
-x_tst<-cbind(x_tst,decodeClassLabels(TEST[,c("Race")]))
-
-###fit kernel for the x matrix
-models<-list()
-param<-c(0.01,0.05,0.25)
-for(i in 1:length(param)){
-print(paste("on loop",i))
-rbf<-rbfdot(sigma=param[i])
-kx<-kernelMatrix(rbf,x)
-kx_tst<-kernelMatrix(rbf,x_tst,x)
-# fit<-glmnet(kx,y,family="multinomial")
-# coef(fit)
-cvfit=cv.glmnet(kx,y,family="multinomial")
-models[[i]]<-cvfit
-}
-
-win<-ceiling(sqrt(length(param)))
-par(mfrow=c(win,win))
-lapply(models,function(b){plot(b)})
-cv_result<-lapply(models,function(b){min(b$cvm)})
-cv_result<-data.frame("lambda"=param,"Min Deviance"=unlist(cv_result))
-print(cv_result)
-cvfit<-models[[which(cv_result$Min.Deviance==min(cv_result$Min.Deviance))]]
-par(op)
-
-#preds<-predict(cvfit,newx=kx_tst,s="lambda.min",type="response")
-coef(cvfit,s="lambda.min")
-
-
-###Plot the linear fit
-######Plot 2-D grid of Classification Rule
-create_grid<-function(x1,x2,n=1000){
-  min_x1<-min(x1)
-  max_x1<-max(x1)
-  x1_seq<-seq(min_x1,max_x1,length.out=floor(sqrt(n)))
-  min_x2<-min(x2)
-  max_x2<-max(x2)
-  x2_seq<-seq(min_x2,max_x2,length.out=floor(sqrt(n)))
-  grid<-expand.grid(H1=x1_seq,H2=x2_seq)
-  return(grid)
-}
-
-s_grid<-create_grid(DATA$H1,DATA$H2,n=10000)
-
-par_disp<-unique(TRAIN$Race)
-race=par_disp[1]
-
-for(race in par_disp){
-  idx<-as.logical(x_tst[,colnames(x_tst)==race])
-  CUT_TEST<-x_tst[idx, ]
-  grid=data.frame(s_grid,CUT_TEST[1,colnames(CUT_TEST) %in% par_disp,drop=F])
-  grid<-as.matrix(grid)
-  grid<-kernelMatrix(rbf,grid,x)
-  func=predict(cvfit,newx=grid,s="lambda.min",type="response")
-  names<-colnames(func)
-  func<-matrix(func,ncol=ncol(func))
-  colnames(func)<-names
-  func<-data.frame(s_grid,func)
-  kx_tst<-kernelMatrix(rbf,CUT_TEST,x)
-  tmp=predict(cvfit,newx=kx_tst,s="lambda.min",type="response")
-  names<-colnames(tmp)
-  tmp<-matrix(tmp,ncol=ncol(tmp))
-  colnames(tmp)<-names
-  class<-apply(tmp,1,function(b){
-    which(b==max(b))
-  })
-  class<-colnames(tmp)[class]
-
-  response<-y_tst[idx]
-  concordance<-numeric(length(response))
-  
-  for (i in 1:nrow(CUT_TEST)){
-    concordance[i]=as.numeric(response[i] %in% class[i])                                   
-  }
-  correct<-round(mean(concordance),3)*100
-  
-  
-  plot_dat<-melt(func,id=c("H1","H2"))
-  plot<-ggplot(data=plot_dat,aes(x=H1,y=H2,fill=value))+
-    geom_tile()+
-    stat_contour(data=plot_dat,aes(z=value))+
-    ggtitle(paste("Probability Distribution for",race,"Percent Correct=",correct,"%"))+
-    facet_wrap(~variable,ncol=2)
-  print(plot)  
-}
-
-
 
 
 ##########################################################################
