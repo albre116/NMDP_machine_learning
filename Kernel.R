@@ -43,6 +43,19 @@ RAW_DATA$Productivity.Group[ RAW_DATA$Productivity.Group=="C"]="B"
 RAW_DATA$Productivity.Group[ RAW_DATA$Productivity.Group=="D"]="C"
 
 
+min_thresh<-min(RAW_DATA$Total.Genotype.Frequency[ RAW_DATA$Total.Genotype.Frequency!=0],na.rm=T)
+RAW_DATA$Total.Genotype.Frequency[ RAW_DATA$Total.Genotype.Frequency==0]<-min_thresh
+RAW_DATA$Total.Genotype.Frequency[ is.na(RAW_DATA$Total.Genotype.Frequency)]=min_thresh
+
+min_thresh<-min(RAW_DATA$Frequency.1[ RAW_DATA$Frequency.1!=0],na.rm=T)
+RAW_DATA$Frequency.1[ RAW_DATA$Frequency.1==0]<-min_thresh
+RAW_DATA$Frequency.1[ is.na(RAW_DATA$Frequency.1)]=min_thresh
+
+min_thresh<-min(RAW_DATA$Frequency.2[ RAW_DATA$Frequency.2!=0],na.rm=T)
+RAW_DATA$Frequency.2[ RAW_DATA$Frequency.2==0]<-min_thresh
+RAW_DATA$Frequency.2[ is.na(RAW_DATA$Frequency.2)]=min_thresh
+
+
 permute<-rbinom(nrow(RAW_DATA),1,prob=0.5)==1
 RAW_DATA[permute,]<-RAW_DATA[permute,c(1:6,8,7,10,9,11:13)]
 DATA<-RAW_DATA[c("RID","Race","Frequency.1",
@@ -64,7 +77,7 @@ summary(DATA)
 
 ####Split Train and Test
 set.seed(1103)
-train_idx<-sample(1:nrow(DATA),floor(nrow(DATA)*0.8))
+train_idx<-sample(1:nrow(DATA),floor(nrow(DATA)*0.5))
 logical<-rep(FALSE,nrow(DATA))
 logical[train_idx]<-TRUE
 train_idx<-logical
@@ -72,7 +85,6 @@ test_idx<-!logical
 rm(logical)
 TRAIN<-DATA[train_idx,]
 TEST<-DATA[test_idx,]
-
 
 #####fit a ksvm kernel to output class probabilities (versus call)
 ######Fit a simple SVM using the e1071 package
