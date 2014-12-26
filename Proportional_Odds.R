@@ -278,51 +278,25 @@ for(i in 1:nrow(ww)){
 }
 
 fit<-polr(Productivity~GF*Race,weights=weights_fit,data=TRAIN)
-#fit<-polr(Productivity~GF*Race,data=TRAIN)
-summary(fit)
-probs<-fitted(fit)
-display<-round(probs,2)
-geno_values<-seq(min(DATA$GF),max(DATA$GF),length.out=10000)
-
-###################################
-####TRAIN Data Fit
-####make charts for different races
-###################################
-par_disp<-unique(TRAIN$Race)
-#par(op)
-#par(mfrow=c(3,2))
-race=par_disp[1]
 
 
-correct<-data.frame()
-for(race in par_disp){ 
-  CUT_TRAIN<-TRAIN[TRAIN$Race==race, ]
-  class_pred<-predict(fit,newdata=CUT_TRAIN)
-  out<-data.frame(table(class_pred,CUT_TRAIN$Productivity))
-  for(id in unique(out$Var2)){
-    out$Freq[out$Var2==id]<-out$Freq[out$Var2==id]/sum(out$Freq[out$Var2==id])
-  }
-  
-  out<-out[ out$class_pred==out$Var2,]
-  c<-paste0(out$Var2,"=",round(out$Freq,2)*100,"%",collapse="; ")
-  correct<-rbind(correct,data.frame(pct_correct=c,Race=race))
-  
+
+###Plot the linear fit
+######Plot 2-D grid of Classification Rule
+create_grid<-function(x1,x2,n=1000){
+  min_x1<-min(x1)
+  max_x1<-max(x1)
+  x1_seq<-seq(min_x1,max_x1,length.out=floor(sqrt(n)))
+  min_x2<-min(x2)
+  max_x2<-max(x2)
+  x2_seq<-seq(min_x2,max_x2,length.out=floor(sqrt(n)))
+  grid<-expand.grid(H1=x1_seq,H2=x2_seq)
+  return(grid)
 }
 
+grid<-create_grid(DATA$H1,DATA$H2,n=10000)
 
-####set up race grids for prediction values
-grid_values<-data.frame()
 
-for(race in par_disp){ 
-  grid<-data.frame("GF"=geno_values,"Race"=race)  
-  preds<-as.data.frame(predict(fit,newdata=grid,type="probs"))
-  grid$Race=paste0(race,": (",correct$pct_correct[correct$Race==race],")")
-  grid_values<-rbind(grid_values,cbind(grid,preds)) 
-}
-
-grid<-melt(grid_values,id=c("GF","Race"))
-
-colnames(grid)[3]<-"Prognosis"
 plot(H1~H2,data=DATA[use_in_fit,])###check data support
 plot(GF~I(H1+H2),data=DATA[use_in_fit,])###check that GF=H1*H2
 float<-lm(GF~I(H1+H2),data=DATA[use_in_fit,])
@@ -337,17 +311,19 @@ CUT_TEST<-TEST[TEST$Race==race, ]
 grid$Race=CUT_TEST$Race[1]
 grid$class<-predict(fit,newdata = grid)
 class<-predict(fit,newdata=CUT_TEST)
-concordance<-numeric(length(class))
-for (i in 1:nrow(CUT_TEST)){
-  concordance[i]=as.numeric(CUT_TEST$Productivity[i] %in% class[i])                                   
-}
-correct<-round(mean(concordance),3)*100
+out<-data.frame(table(class,CUT_TEST$Productivity))
+  for(id in unique(out$Var2)){
+    out$Freq[out$Var2==id]<-out$Freq[out$Var2==id]/sum(out$Freq[out$Var2==id])
+  }
+out<-out[ out$class==out$Var2,]
+c<-paste0(out$Var2,"=",round(out$Freq,2)*100,"%",collapse="; ")
+
 base_layer<-ggplot(data=grid,aes(x=H1,y=H2,colour=class))+
   ggtitle(paste("Decision Boundaries, Race=",race))+
   geom_point(size=3.5,alpha=1,shape=15)
 
 train_plot<-base_layer+geom_text(data=CUT_TEST,aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
-  ggtitle(paste("Decision Boundaries for",race,"Percent Correct=",correct,"%"))+facet_wrap(~Productivity,ncol=2)
+  ggtitle(paste("Decision Boundaries for",race,"Percent Correct=",c))+facet_wrap(~Productivity,ncol=2)
 print(train_plot)
 
 }
