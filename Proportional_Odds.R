@@ -2,14 +2,35 @@
 ####Cumulative (proportional odds) logit analysis
 ####################################################
 source("data_prep.R")
+####summarize deomgraphics data
+table(TRAIN$Race)
+table(TEST$Race)
+
+ftable(TRAIN$Race,TRAIN$Productivity)
+ftable(TEST$Race,TEST$Productivity)
+
 
 ###Try a basic Proportional Odds Model on the genotype Frequencies
-fit<-polr(Productivity~GF*Race,data=TRAIN)
+###first fit weights to the different classes
+ww<-table(TRAIN$Productivity,TRAIN$Race)
+ww<-as.data.frame(ww)
+for(race in unique(ww$Var2)){
+  idx<-ww$Var2==race
+  ww$Freq[idx]<-ww$Freq[idx]/sum(ww$Freq[idx])
+  ww$Freq[idx]<-1/ww$Freq[idx]
+}
+TRAIN$weights_fit<-0
+for(i in 1:nrow(ww)){
+  idx<-TRAIN$Race==ww$Var2[i] & as.character(TRAIN$Productivity)==ww$Var1[i]
+  TRAIN$weights_fit[idx]<-ww$Freq[i]
+}
+
+fit<-polr(Productivity~GF*Race,weights=weights_fit,data=TRAIN)
+#fit<-polr(Productivity~GF*Race,data=TRAIN)
 summary(fit)
 probs<-fitted(fit)
 display<-round(probs,2)
 geno_values<-seq(min(DATA$GF),max(DATA$GF),length.out=10000)
-
 
 ###################################
 ####TRAIN Data Fit
@@ -24,13 +45,15 @@ race=par_disp[1]
 correct<-data.frame()
 for(race in par_disp){ 
   CUT_TRAIN<-TRAIN[TRAIN$Race==race, ]
-  class<-predict(fit,newdata=CUT_TRAIN)
-  concordance<-numeric(length(class))
-  for (i in 1:nrow(CUT_TRAIN)){
-    concordance[i]=as.numeric(CUT_TRAIN$Productivity[i] %in% class[i])                                   
+  class_pred<-predict(fit,newdata=CUT_TRAIN)
+  out<-data.frame(table(class_pred,CUT_TRAIN$Productivity))
+  for(id in unique(out$Var2)){
+    out$Freq[out$Var2==id]<-out$Freq[out$Var2==id]/sum(out$Freq[out$Var2==id])
   }
   
-  correct<-rbind(correct,data.frame(pct_correct=mean(concordance),Race=race))
+  out<-out[ out$class_pred==out$Var2,]
+  c<-paste0(out$Var2,"=",round(out$Freq,2)*100,"%",collapse="; ")
+  correct<-rbind(correct,data.frame(pct_correct=c,Race=race))
   
 }
 
@@ -41,7 +64,7 @@ grid_values<-data.frame()
 for(race in par_disp){ 
   grid<-data.frame("GF"=geno_values,"Race"=race)  
   preds<-as.data.frame(predict(fit,newdata=grid,type="probs"))
-  grid$Race=paste(race,paste0(round(correct$pct_correct[correct$Race==race],3)*100,"% ","Correct"))
+  grid$Race=paste0(race,": (",correct$pct_correct[correct$Race==race],")")
   grid_values<-rbind(grid_values,cbind(grid,preds)) 
 }
 
@@ -68,6 +91,10 @@ for(race in par_disp){
   cutoff_values<-rbind(cutoff_values,data.frame(cut=t(Cutoff),Race=race))   
 }
 
+cutoff_natural_scale<-cutoff_values
+cutoff_natural_scale$cut<-exp(cutoff_natural_scale$cut)
+cutoff_natural_scale$cut<-signif(cutoff_natural_scale$cut,2)
+print(cutoff_natural_scale)
 
 
 class(grid$Race)
@@ -90,7 +117,13 @@ plot_boundaries_train<-ggplot(data=grid)+geom_line(aes(x=GF,y=value,colour=Progn
   facet_wrap(~Race)+geom_vline(data=cutoff_values,aes(xintercept=cut),lwd=1,lty=1)+
   geom_text(data=TRAIN,aes(x=GF,y=value,label=Productivity),size=5,colour="black")+
   ylab("Prognosis Probability")+xlab("Log(Genotype Frequency)")+
-  ggtitle(paste0("Training Data: n=",nrow(TRAIN)," Observations Used for Model Fit"))
+  theme(strip.text.x = element_text(size = 15),
+        axis.text.x = element_text(size=15),
+        axis.text.y = element_text(size=15),
+        axis.title.x = element_text(size=15),
+        axis.title.y = element_text(size=15),
+        legend.text=element_text(size=15),
+        legend.title=element_text(size=15))
 
 print(plot_boundaries_train)
 
@@ -106,17 +139,49 @@ par_disp<-unique(TEST$Race)
 race=par_disp[1]
 
 
+####get the confusion matrix for all combinations
+all<-data.frame(prediction=predict(fit,newdata=TEST))
+all$prediction<-all$prediction
+all$truth<-TEST$Productivity
+all$race<-TEST$Race
+
+result<-ftable(all$race,all$truth,all$prediction)
+print(result)
+result<-data.frame(result)
+colnames(result)<-c("Race","Truth","Prediction","Freq")
+
+for(u in unique(result$Race)){
+  for(b in unique(result$Truth)){
+    idx<-result$Race==u & result$Truth==b
+    result$Freq[idx]<-result$Freq[idx]/sum(result$Freq[idx])
+  }
+}
+
+plot_dat<-arrange(result,Race,Truth,Prediction)
+plot_dat<-ddply(plot_dat,c("Race","Truth"),transform,label_y=cumsum(Freq)-0.5*Freq)
+
+
+plot_bars<-ggplot(data=plot_dat,aes(x=Truth,y=Freq,fill=Prediction))+
+  geom_bar(stat="identity")+facet_wrap(~Race)+
+  geom_text(aes(y=label_y,label=round(Freq*100,1)))+
+  ggtitle("Percent Concordance on Validation Data by Class")+
+  xlab("True Search Productivity Classification")+ylab("Percent")
+print(plot_bars)
+
+
+
 correct<-data.frame()
 for(race in par_disp){ 
   CUT_TEST<-TEST[TEST$Race==race, ]
-  class<-predict(fit,newdata=CUT_TEST)
-  concordance<-numeric(length(class))
-  for (i in 1:nrow(CUT_TEST)){
-    concordance[i]=as.numeric(CUT_TEST$Productivity[i] %in% class[i])                                   
+  class_pred<-predict(fit,newdata=CUT_TEST)
+  out<-data.frame(table(class_pred,CUT_TEST$Productivity))
+  for(id in unique(out$Var2)){
+    out$Freq[out$Var2==id]<-out$Freq[out$Var2==id]/sum(out$Freq[out$Var2==id])
   }
   
-  correct<-rbind(correct,data.frame(pct_correct=mean(concordance),Race=race))
-  
+  out<-out[ out$class_pred==out$Var2,]
+  c<-paste0(out$Var2,"=",round(out$Freq,2)*100,"%",collapse="; ")
+  correct<-rbind(correct,data.frame(pct_correct=c,Race=race))
 }
 
 
@@ -126,7 +191,7 @@ grid_values<-data.frame()
 for(race in par_disp){ 
   grid<-data.frame("GF"=geno_values,"Race"=race)  
   preds<-as.data.frame(predict(fit,newdata=grid,type="probs"))
-  grid$Race=paste(race,paste0(round(correct$pct_correct[correct$Race==race],3)*100,"% ","Correct"))
+  grid$Race=paste0(race,": (",correct$pct_correct[correct$Race==race],")")
   grid_values<-rbind(grid_values,cbind(grid,preds)) 
 }
 
@@ -176,12 +241,17 @@ plot_boundaries_test<-ggplot(data=grid)+geom_line(aes(x=GF,y=value,colour=Progno
   facet_wrap(~Race)+geom_vline(data=cutoff_values,aes(xintercept=cut),lwd=1,lty=1)+
   geom_text(data=TEST,aes(x=GF,y=value,label=Productivity),size=5,colour="black")+
   ylab("Prognosis Probability")+xlab("Log(Genotype Frequency)")+
-  ggtitle(paste0("testing Data: n=",nrow(TEST)," Observations Held Out from Model Fit"))
+  theme(strip.text.x = element_text(size = 15),
+        axis.text.x = element_text(size=15),
+        axis.text.y = element_text(size=15),
+        axis.title.x = element_text(size=15),
+        axis.title.y = element_text(size=15),
+        legend.text=element_text(size=15),
+        legend.title=element_text(size=15))
 
 print(plot_boundaries_test)
 
 print(cutoff_values)
-
 
 #########################################################
 #########################################################
@@ -189,71 +259,70 @@ print(cutoff_values)
 #########################################################
 #########################################################
 
-###Import Data
-RAW_DATA<-read.csv("Raw_Data.csv")
-RAW_DATA$Productivity.Group<-as.character(RAW_DATA$Productivity.Group)
-RAW_DATA$Productivity.Group[ RAW_DATA$Productivity.Group=="B"]="A"
-RAW_DATA$Productivity.Group[ RAW_DATA$Productivity.Group=="C"]="B"
-RAW_DATA$Productivity.Group[ RAW_DATA$Productivity.Group=="D"]="C"
+source("data_prep.R")
 
 
-min_thresh_gf<-min(RAW_DATA$Total.Genotype.Frequency[ RAW_DATA$Total.Genotype.Frequency!=0],na.rm=T)
-RAW_DATA$Total.Genotype.Frequency[ RAW_DATA$Total.Genotype.Frequency==0]<-min_thresh_gf
-RAW_DATA$Total.Genotype.Frequency[ is.na(RAW_DATA$Total.Genotype.Frequency)]=min_thresh_gf
-
-min_thresh_h1<-min(RAW_DATA$Frequency.1[ RAW_DATA$Frequency.1!=0],na.rm=T)
-RAW_DATA$Frequency.1[ RAW_DATA$Frequency.1==0]<-min_thresh_h1
-RAW_DATA$Frequency.1[ is.na(RAW_DATA$Frequency.1)]=min_thresh_h1
-
-min_thresh_h2<-min(RAW_DATA$Frequency.2[ RAW_DATA$Frequency.2!=0],na.rm=T)
-RAW_DATA$Frequency.2[ RAW_DATA$Frequency.2==0]<-min_thresh_h2
-RAW_DATA$Frequency.2[ is.na(RAW_DATA$Frequency.2)]=min_thresh_h2
-
-
-permute<-rbinom(nrow(RAW_DATA),1,prob=0.5)==1
-RAW_DATA[permute,]<-RAW_DATA[permute,c(1:6,8,7,10,9,11:13)]
-DATA<-RAW_DATA[c("RID","Race","Frequency.1",
-                 "Frequency.2","Rank.1","Rank.2",
-                 "Total.Genotype.Frequency","Productivity.Group")]
-
-DATA$Productivity.Group<-ordered(DATA$Productivity.Group,levels=c("C","B","A"))
-colnames(DATA)<-c("RID","Race","H1","H2","Rank_H1","Rank_H2","GF","Productivity")
-DATA<-DATA[complete.cases(DATA),]###remove NA's
-use_in_fit<-DATA$GF>min_thresh_gf & DATA$H1>min_thresh_h1 & DATA$H2>min_thresh_h2
-rm(RAW_DATA)
-
-###Format Predictors to be ln-scale
-DATA$GF<-log(DATA$GF)
-DATA$H1<-log(DATA$H1)
-DATA$H2<-log(DATA$H2)
-DATA[c("H1","H2","GF")]<-normalizeData(DATA[c("H1","H2","GF")],type="0_1")
-summary(DATA)
-
-####Split Train and Test
-set.seed(1103)
-train_idx<-sample(1:nrow(DATA),floor(nrow(DATA)*0.5))
-logical<-rep(FALSE,nrow(DATA))
-logical[train_idx]<-TRUE
-train_idx<-logical
-test_idx<-!logical
-rm(logical)
-TRAIN<-DATA[train_idx,]
-TEST<-DATA[test_idx,]
-
-
-
-######Plot 2-D grid of Classification Rule
-create_grid<-function(x1,x2,n=1000){
-  min_x1<-min(x1)
-  max_x1<-max(x1)
-  x1_seq<-seq(min_x1,max_x1,length.out=floor(sqrt(n)))
-  min_x2<-min(x2)
-  max_x2<-max(x2)
-  x2_seq<-seq(min_x2,max_x2,length.out=floor(sqrt(n)))
-  grid<-expand.grid(H1=x1_seq,H2=x2_seq)
-  return(grid)
+###Try a basic Proportional Odds Model on the genotype Frequencies
+###first fit weights to the different classes
+ww<-table(TRAIN$Productivity,TRAIN$Race)
+ww<-as.data.frame(ww)
+for(race in unique(ww$Var2)){
+  idx<-ww$Var2==race
+  ww$Freq[idx]<-ww$Freq[idx]/sum(ww$Freq[idx])
+  ww$Freq[idx]<-1/ww$Freq[idx]
+}
+TRAIN$weights_fit<-0
+for(i in 1:nrow(ww)){
+  idx<-TRAIN$Race==ww$Var2[i] & as.character(TRAIN$Productivity)==ww$Var1[i]
+  TRAIN$weights_fit[idx]<-ww$Freq[i]
 }
 
+fit<-polr(Productivity~GF*Race,weights=weights_fit,data=TRAIN)
+#fit<-polr(Productivity~GF*Race,data=TRAIN)
+summary(fit)
+probs<-fitted(fit)
+display<-round(probs,2)
+geno_values<-seq(min(DATA$GF),max(DATA$GF),length.out=10000)
+
+###################################
+####TRAIN Data Fit
+####make charts for different races
+###################################
+par_disp<-unique(TRAIN$Race)
+#par(op)
+#par(mfrow=c(3,2))
+race=par_disp[1]
+
+
+correct<-data.frame()
+for(race in par_disp){ 
+  CUT_TRAIN<-TRAIN[TRAIN$Race==race, ]
+  class_pred<-predict(fit,newdata=CUT_TRAIN)
+  out<-data.frame(table(class_pred,CUT_TRAIN$Productivity))
+  for(id in unique(out$Var2)){
+    out$Freq[out$Var2==id]<-out$Freq[out$Var2==id]/sum(out$Freq[out$Var2==id])
+  }
+  
+  out<-out[ out$class_pred==out$Var2,]
+  c<-paste0(out$Var2,"=",round(out$Freq,2)*100,"%",collapse="; ")
+  correct<-rbind(correct,data.frame(pct_correct=c,Race=race))
+  
+}
+
+
+####set up race grids for prediction values
+grid_values<-data.frame()
+
+for(race in par_disp){ 
+  grid<-data.frame("GF"=geno_values,"Race"=race)  
+  preds<-as.data.frame(predict(fit,newdata=grid,type="probs"))
+  grid$Race=paste0(race,": (",correct$pct_correct[correct$Race==race],")")
+  grid_values<-rbind(grid_values,cbind(grid,preds)) 
+}
+
+grid<-melt(grid_values,id=c("GF","Race"))
+
+colnames(grid)[3]<-"Prognosis"
 plot(H1~H2,data=DATA[use_in_fit,])###check data support
 plot(GF~I(H1+H2),data=DATA[use_in_fit,])###check that GF=H1*H2
 float<-lm(GF~I(H1+H2),data=DATA[use_in_fit,])
