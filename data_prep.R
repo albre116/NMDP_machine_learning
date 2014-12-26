@@ -74,6 +74,7 @@ DATA$GF<-log(DATA$GF)
 DATA$H1<-log(DATA$H1)
 DATA$H2<-log(DATA$H2)
 DATA[c("H1","H2","GF")]<-normalizeData(DATA[c("H1","H2","GF")],type="0_1")
+DATA$Race<-as.factor(DATA$Race)
 summary(DATA)
 
 ####Split Train and Test

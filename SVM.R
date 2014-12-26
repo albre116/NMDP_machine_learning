@@ -9,7 +9,7 @@ weights<-table(TRAIN$Productivity)/nrow(TRAIN)
 # weights["A"]=0.97
 # weights["B"]=0.01
 # weights["C"]=0.01
-# weights["D"]=0.01
+
 
 ####Do A linear Fit
 tune.out<-tune(svm,Productivity~H1+H2+Race,data=TRAIN,kernel="polynomial",
@@ -48,17 +48,19 @@ for(race in par_disp){
   grid$Race=CUT_TEST$Race[1]
   grid$class<-predict(bestmod,newdata = grid)
   class<-predict(bestmod,newdata=CUT_TEST)
-  concordance<-numeric(length(class))
-  for (i in 1:nrow(CUT_TEST)){
-    concordance[i]=as.numeric(CUT_TEST$Productivity[i] %in% class[i])                                   
+  out<-data.frame(table(class,CUT_TEST$Productivity))
+  for(id in unique(out$Var2)){
+    out$Freq[out$Var2==id]<-out$Freq[out$Var2==id]/sum(out$Freq[out$Var2==id])
   }
-  correct<-round(mean(concordance),3)*100
+  out<-out[ out$class==out$Var2,]
+  c<-paste0(out$Var2,"=",round(out$Freq,2)*100,"%",collapse="; ")
+  
   base_layer<-ggplot(data=grid,aes(x=H1,y=H2,colour=class))+
     ggtitle(paste("Decision Boundaries, Race=",race))+
     geom_point(size=3.5,alpha=1,shape=15)
   
   train_plot<-base_layer+geom_text(data=CUT_TEST,aes(x=H1,y=H2,label=Productivity),size=5,colour="black")+
-    ggtitle(paste("Decision Boundaries for",race,"Percent Correct=",correct,"%"))+facet_wrap(~Productivity,ncol=2)
+    ggtitle(paste("Decision Boundaries for",race,"Percent Correct=",c))+facet_wrap(~Productivity,ncol=2)
   print(train_plot)
   
 }
