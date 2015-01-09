@@ -26,7 +26,6 @@ for(i in 1:nrow(ww)){
 }
 
 fit<-polr(Productivity~GF*Race,weights=weights_fit,data=TRAIN)
-#fit<-polr(Productivity~GF*Race,data=TRAIN)
 summary(fit)
 probs<-fitted(fit)
 display<-round(probs,2)
