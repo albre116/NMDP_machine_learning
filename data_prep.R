@@ -32,6 +32,8 @@ if(!require("Rcpp"))
   (install.packages("Rcpp"))
 if(!require("neuralnet"))
   (install.packages("neuralnet"))
+if(!require("glmnet"))
+  (install.packages("glmnet"))
 
 
 ###Import Data

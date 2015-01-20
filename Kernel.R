@@ -91,8 +91,6 @@ for(race in par_disp){
     facet_wrap(~variable,ncol=2)
   print(plot)  
   
-    
-  
 }
 
 
@@ -103,25 +101,52 @@ for(race in par_disp){
 ###that should perform similar to
 ###the kernel based methods above
 ###Use a penalized GLM fit to the data to pull out relevant kernel elements
+###Plus model everything together
 ##########################################################################
-y=as.factor(as.character(TRAIN$Productivity))
+ww<-table(TRAIN$Productivity,TRAIN$Race)
+ww<-as.data.frame(ww)
+ntotal<-sum(ww$Freq)
+for(race in unique(ww$Var2)){
+  idx<-ww$Var2==race
+  ###get the count for this race
+  race_margin<-sum(ww$Freq[idx])
+  
+  ###adjust within category proportions
+  ww$Freq[idx]<-ww$Freq[idx]/sum(ww$Freq[idx])
+  ww$Freq[idx]<-1/ww$Freq[idx]
+  
+  ###adjust by race margin
+  ww$Freq[idx]<-ww$Freq[idx]*(ntotal/race_margin)
+}
+
+TRAIN$weights_fit<-0
+for(i in 1:nrow(ww)){
+  idx<-TRAIN$Race==ww$Var2[i] & as.character(TRAIN$Productivity)==ww$Var1[i]
+  TRAIN$weights_fit[idx]<-ww$Freq[i]
+}
+
+###take subsample or algorithm will take forever
+TRAIN_SUB<-TRAIN[sample(1:nrow(TRAIN),floor(nrow(TRAIN)*0.15)),]
+
+y=as.factor(as.character(TRAIN_SUB$Productivity))
 y_tst=as.factor(as.character(TEST$Productivity))
-x=as.matrix(TRAIN[c("H1","H2")])
-x<-cbind(x,decodeClassLabels(TRAIN[,c("Race")]))
+x=as.matrix(TRAIN_SUB[c("H1","H2")])
+x<-cbind(x,decodeClassLabels(TRAIN_SUB[,c("Race")]))
 x_tst=as.matrix(TEST[c("H1","H2")])
 x_tst<-cbind(x_tst,decodeClassLabels(TEST[,c("Race")]))
+weights<-TRAIN_SUB$weights_fit
+
 
 ###fit kernel for the x matrix
 models<-list()
 param<-c(0.25,1,1.5)
+i=1
 for(i in 1:length(param)){
   print(paste("on loop",i))
   rbf<-rbfdot(sigma=param[i])
   kx<-kernelMatrix(rbf,x)
   kx_tst<-kernelMatrix(rbf,x_tst,x)
-  # fit<-glmnet(kx,y,family="multinomial")
-  # coef(fit)
-  cvfit=cv.glmnet(kx,y,family="multinomial")
+  cvfit=cv.glmnet(kx,y,family="multinomial",weights=weights)
   models[[i]]<-cvfit
 }
 
@@ -302,11 +327,13 @@ for(race in par_disp){
 
 
 
-
 ##########################################################################
 #####Now Apply a gaussian Process to the data using RBF kernel
 #####This has a natural probabilisitc interpretation that SVM doesn't have
 ##########################################################################
+
+
+####This needs to be class balanced####
 
 bestmod<-gausspr(Productivity~H1+H2+Race,data=TRAIN,kernel="rbfdot",
               kpar="automatic")
@@ -366,6 +393,8 @@ for(race in par_disp){
 #####Using a SNP variant type data Set
 #####Only for example
 ##########################################################################
+###this needs to be balanced###
+
 source("gausspr_mod.R")
 
 knew<-function (scale=0.001) 
