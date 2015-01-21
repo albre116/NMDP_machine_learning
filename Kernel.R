@@ -148,7 +148,7 @@ for(i in 1:length(param)){
   print(paste("on loop",i))
   rbf<-rbfdot(sigma=param[i])
   kx<-kernelMatrix(rbf,x)
-  kx_tst<-kernelMatrix(rbf,x_tst,x)
+  #kx_tst<-kernelMatrix(rbf,x_tst,x)
   cvfit=cv.glmnet(kx,y,family="multinomial",weights=weights)
   models[[i]]<-cvfit
 }
