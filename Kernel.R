@@ -105,35 +105,38 @@ for(race in par_disp){
 ##########################################################################
 ww<-table(TRAIN$Productivity,TRAIN$Race)
 ww<-as.data.frame(ww)
-ntotal<-sum(ww$Freq)
 for(race in unique(ww$Var2)){
   idx<-ww$Var2==race
   ###get the count for this race
-  race_margin<-sum(ww$Freq[idx])
   
   ###adjust within category proportions
   ww$Freq[idx]<-ww$Freq[idx]/sum(ww$Freq[idx])
   ww$Freq[idx]<-1/ww$Freq[idx]
-  
-  ###adjust by race margin
-  ww$Freq[idx]<-ww$Freq[idx]*(ntotal/race_margin)
+
 }
 
-TRAIN$weights_fit<-0
+TRAIN$weights_fit<-1
 for(i in 1:nrow(ww)){
   idx<-TRAIN$Race==ww$Var2[i] & as.character(TRAIN$Productivity)==ww$Var1[i]
   TRAIN$weights_fit[idx]<-ww$Freq[i]
 }
 
+par_disp<-unique(TRAIN$Race)
+race=par_disp[1]
+
+
+for(race in par_disp){
+
 ###take subsample or algorithm will take forever
-TRAIN_SUB<-TRAIN[sample(1:nrow(TRAIN),floor(nrow(TRAIN)*0.25)),]
+TRAIN_SUB<-TRAIN[ TRAIN$Race==race,]
+TEST_SUB<-TEST[ TEST$Race==race,]
 
 y=as.factor(as.character(TRAIN_SUB$Productivity))
-y_tst=as.factor(as.character(TEST$Productivity))
+y_tst=as.factor(as.character(TEST_SUB$Productivity))
 x=as.matrix(TRAIN_SUB[c("H1","H2")])
-x<-cbind(x,decodeClassLabels(TRAIN_SUB[,c("Race")]))
-x_tst=as.matrix(TEST[c("H1","H2")])
-x_tst<-cbind(x_tst,decodeClassLabels(TEST[,c("Race")]))
+#x<-cbind(x,decodeClassLabels(TRAIN_SUB[,c("Race")]))
+x_tst=as.matrix(TEST_SUB[c("H1","H2")])
+#x_tst<-cbind(x_tst,decodeClassLabels(TEST_SUB[,c("Race")]))
 weights<-TRAIN_SUB$weights_fit
 
 
@@ -162,9 +165,6 @@ par(op)
 #preds<-predict(cvfit,newx=kx_tst,s="lambda.min",type="response")
 coef(cvfit,s="lambda.min")
 
-
-###Plot the linear fit
-######Plot 2-D grid of Classification Rule
 create_grid<-function(x1,x2,n=1000){
   min_x1<-min(x1)
   max_x1<-max(x1)
@@ -176,42 +176,37 @@ create_grid<-function(x1,x2,n=1000){
   return(grid)
 }
 
-s_grid<-create_grid(DATA$H1,DATA$H2,n=10000)
+grid<-create_grid(DATA$H1,DATA$H2,n=10000)
 
-par_disp<-unique(TRAIN$Race)
-race=par_disp[1]
 
-for(race in par_disp){
-  idx<-as.logical(x_tst[,colnames(x_tst)==race])
-  CUT_TEST<-x_tst[idx, ]
-  grid=data.frame(s_grid,CUT_TEST[1,colnames(CUT_TEST) %in% par_disp,drop=F])
-  grid<-as.matrix(grid)
-  grid<-kernelMatrix(rbf,grid,x)
-  func=predict(cvfit,newx=grid,s="lambda.min",type="response")
-  names<-colnames(func)
-  func<-matrix(func,ncol=ncol(func))
-  colnames(func)<-names
-  func<-data.frame(s_grid,func)
-  kx_tst<-kernelMatrix(rbf,CUT_TEST,x)
-  tmp=predict(cvfit,newx=kx_tst,s="lambda.min",type="response")
-  names<-colnames(tmp)
-  tmp<-matrix(tmp,ncol=ncol(tmp))
-  colnames(tmp)<-names
-  class<-apply(tmp,1,function(b){
+CUT_TEST<-x_tst
+grid_p<-as.matrix(grid)
+grid_p<-kernelMatrix(rbf,grid_p,x)
+func=predict(cvfit,newx=grid_p,s="lambda.min",type="response")
+names<-colnames(func)
+func<-matrix(func,ncol=ncol(func))
+colnames(func)<-names
+func<-data.frame(grid,func)
+kx_tst<-kernelMatrix(rbf,CUT_TEST,x)
+tmp=predict(cvfit,newx=kx_tst,s="lambda.min",type="response")
+names<-colnames(tmp)
+tmp<-matrix(tmp,ncol=ncol(tmp))
+colnames(tmp)<-names
+class<-apply(tmp,1,function(b){
     which(b==max(b))
-  })
-  class<-colnames(tmp)[class]
+})
+class<-colnames(tmp)[class]
   
-  response<-y_tst[idx]
-  concordance<-numeric(length(response))
+response<-y_tst
+concordance<-numeric(length(response))
   
-  for (i in 1:nrow(CUT_TEST)){
+for (i in 1:nrow(CUT_TEST)){
     concordance[i]=as.numeric(response[i] %in% class[i])                                   
-  }
-  correct<-round(mean(concordance),3)*100
+}
+correct<-round(mean(concordance),3)*100
   
   
-  plot_dat<-melt(func,id=c("H1","H2"))
+plot_dat<-melt(func,id=c("H1","H2"))
   plot<-ggplot(data=plot_dat,aes(x=H1,y=H2,fill=value))+
     geom_tile()+
     stat_contour(data=plot_dat,aes(z=value))+
