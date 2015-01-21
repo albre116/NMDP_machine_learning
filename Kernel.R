@@ -126,7 +126,7 @@ for(i in 1:nrow(ww)){
 }
 
 ###take subsample or algorithm will take forever
-TRAIN_SUB<-TRAIN[sample(1:nrow(TRAIN),floor(nrow(TRAIN)*0.15)),]
+TRAIN_SUB<-TRAIN[sample(1:nrow(TRAIN),floor(nrow(TRAIN)*0.25)),]
 
 y=as.factor(as.character(TRAIN_SUB$Productivity))
 y_tst=as.factor(as.character(TEST$Productivity))

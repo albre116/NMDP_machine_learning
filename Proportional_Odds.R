@@ -19,7 +19,7 @@ for(race in unique(ww$Var2)){
   ww$Freq[idx]<-ww$Freq[idx]/sum(ww$Freq[idx])
   ww$Freq[idx]<-1/ww$Freq[idx]
 }
-TRAIN$weights_fit<-0
+TRAIN$weights_fit<-1
 for(i in 1:nrow(ww)){
   idx<-TRAIN$Race==ww$Var2[i] & as.character(TRAIN$Productivity)==ww$Var1[i]
   TRAIN$weights_fit[idx]<-ww$Freq[i]
