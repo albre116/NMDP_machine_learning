@@ -124,8 +124,8 @@ for(i in 1:nrow(ww)){
 par_disp<-unique(TRAIN$Race)
 race=par_disp[2]
 
-
-for(race in par_disp){
+####only do API otherwise takes forever
+for(race in race){
 
 ###take subsample or algorithm will take forever
 TRAIN_SUB<-TRAIN[ TRAIN$Race==race,]
