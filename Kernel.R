@@ -122,7 +122,7 @@ for(i in 1:nrow(ww)){
 }
 
 par_disp<-unique(TRAIN$Race)
-race=par_disp[1]
+race=par_disp[2]
 
 
 for(race in par_disp){
@@ -223,6 +223,7 @@ plot_dat<-melt(func,id=c("H1","H2"))
 ###To the continous response
 ###So that we can do multiple regression on Y
 ##########################################################################
+####needs to be blanaced not correct as of now####
 y=TRAIN[c("ten_of_tens","nine_of_tens")]
 y_tst=TEST[c("ten_of_tens","nine_of_tens")]
 x=as.matrix(TRAIN[c("H1","H2")])
