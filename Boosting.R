@@ -1,5 +1,52 @@
+#####################################################
+####Boosting Tutorial
+#####################################################
+source("data_prep.R")
+mu=c(1,2)#mean of simulated data
+sig=matrix(c(1,0.5,0.5,2),nrow=2,byrow=T)
+x<-mvrnorm(n=1000,mu=mu,Sigma=sig)
+y<-1.5+3*x[,1]+rnorm(nrow(x),mean=0,sd=1) ###make simple association with x1
+
+data=data.frame(x=x[,1],y=y)
+ggplot(data,aes(x,y))+geom_point()+ggtitle("Scatterplot of Y vs X")
+
+L2_Loss<-function(Beta,y,x){
+  residual <- (y-(Beta[1]+Beta[2]*x))^2  
+  SSE <- sum(residual)
+  return(-SSE)
+}
+
+Gradient<-function(Beta,y,x){
+  residual <- y-(Beta[1]+Beta[2]*x)  
+  return(residual)
+}
+
+
+beta_grid<-expand.grid(seq(0,3,length.out = 50),
+                       seq(1.5,4.5,length.out=50))
+
+colnames(beta_grid) <- c("B0","B1")
+beta_grid$Loss<-apply(beta_grid,1,L2_Loss,y=data$y,x=data$x)
+
+ggplot(beta_grid,aes(x=B0,y=B1,z=Loss))+geom_contour()
+
+
+beta=c(1.5,0)###  starting point for all values
+
+
+
+
+grad<-Gradient(beta,data$y,data$x)
+
+
+
+
+
+
+
+
 ####################################################
-####Boosting using trees
+####Boosting using trees with GBM package
 ####################################################
 source("data_prep.R")
 
