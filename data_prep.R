@@ -36,6 +36,11 @@ if(!require("glmnet"))
   (install.packages("glmnet"))
 if(!require("mboost"))
   (install.packages("mboost"))
+if(!require("RColorBrewer"))
+  (install.packages("RColorBrewer"))
+if(!require("BayesTree"))
+  (install.packages("BayesTree"))
+
 
 ###Import Data
 RAW_DATA<-read.csv("Raw_Data.csv")
