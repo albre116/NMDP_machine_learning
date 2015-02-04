@@ -11,34 +11,88 @@ data=data.frame(x=x[,1],y=y)
 ggplot(data,aes(x,y))+geom_point()+ggtitle("Scatterplot of Y vs X")
 
 L2_Loss<-function(Beta,y,x){
-  residual <- (y-(Beta[1]+Beta[2]*x))^2  
+  residual <- (1/2)*(y-(Beta[1]+Beta[2]*x))^2  
   SSE <- sum(residual)
   return(-SSE)
 }
 
-Gradient<-function(Beta,y,x){
-  residual <- y-(Beta[1]+Beta[2]*x)  
+Gradient_Residual<-function(Beta,y,x){
+  residual <- -(y-(Beta[1]+Beta[2]*x))  
   return(residual)
+}
+
+predict_fit <- function(Beta,x){
+  f_x <- Beta[1]+Beta[2]*x
+  return(f_x)
 }
 
 
 beta_grid<-expand.grid(seq(0,3,length.out = 50),
                        seq(1.5,4.5,length.out=50))
-
 colnames(beta_grid) <- c("B0","B1")
 beta_grid$Loss<-apply(beta_grid,1,L2_Loss,y=data$y,x=data$x)
-
+####look at the true loss function 
 ggplot(beta_grid,aes(x=B0,y=B1,z=Loss))+geom_contour()
 
 
-beta=c(1.5,0)###  starting point for all values
+
+beta=c(0,1.5)###  starting point for all values
+learn_rate=0.1
+nboost=100
+beta_history <- matrix(nrow=nboost+1,ncol=2)
+colnames(beta_history) <- c("B0","B1")
+beta_history <- as.data.frame(beta_history)
+beta_history[1,] <- beta
+
+####look at starting point
+f_x <- predict_fit(beta,data$x)
+plot_f_x<-data.frame(x=data$x,y=f_x) %>% arrange(x)
+ggplot(data,aes(x,y))+geom_point()+ggtitle("Starting Model Fit")+
+  geom_line(data=plot_f_x,aes(x=x,y=y))
+
+###run boosting
+for (i in 1:nboost){
+
+###compute the negative gradient
+neg_grad<--(Gradient_Residual(beta,y=data$y,x=data$x))
+
+###fit the simple base learner
+grad_plot <- data.frame(x=data$x,neg_grad=neg_grad)
+fit <- lm(neg_grad~x,data=grad_plot)
+beta[1] <- beta[1]+learn_rate*fit$coefficients[1]
+beta[2] <- beta[2]+learn_rate*fit$coefficients[2]
+beta_history[1+i,] <- beta
+}
+
+####look at fit after M boosting iterations
+f_x <- predict_fit(beta,data$x)
+plot_f_x<-data.frame(x=data$x,y=f_x) %>% arrange(x)
+ggplot(data,aes(x,y))+geom_point()+
+  geom_line(data=plot_f_x,aes(x=x,y=y))+
+  ggtitle(paste("Model Fit (f_x) after M=",nboost,"Boosting Iterations"))
+
+####look at the gradient residuals of the last fit to which the base
+####learner is being fit
+ggplot(data=grad_plot,aes(x=x,y=neg_grad))+geom_point()+
+  geom_abline(intercept = fit$coefficients[1], slope = fit$coefficients[2])+
+  ggtitle(paste("Gradient Residuals After M=",nboost,"Boosting Iterations and Base Learner Fit"))
+
+####look at the descent path of the beta values
+####as the simple base learners are combined
+ggplot()+geom_contour(data=beta_grid,aes(x=B0,y=B1,z=Loss))+
+  geom_line(data=beta_history,aes(x=B0,y=B1),lwd=1)+
+  geom_point(data=beta_history,aes(x=B0,y=B1),size=3)+
+  ggtitle(paste("Gradient Descent Path Across Loss Function After M=",nboost,"Boosting Iterations"))
 
 
+###Print final model fit
+print(paste0("Y=",beta[1]," + ",beta[2],"*X"))
 
-
-grad<-Gradient(beta,data$y,data$x)
-
-
+####################################################
+####Now lets make this more realistic
+####And use the mboost package
+####to specify other base learners
+####################################################
 
 
 
