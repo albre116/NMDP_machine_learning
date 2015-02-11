@@ -2,6 +2,7 @@ rm(list=ls())
 gc()
 graphics.off()
 op<-par()
+options(java.parameters = "-Xmx4000m") ###set the Java heap to 4GB RAM
 if(!require("MASS"))
   (install.packages("MASS"))
 if(!require("ggplot2"))
@@ -40,6 +41,8 @@ if(!require("RColorBrewer"))
   (install.packages("RColorBrewer"))
 if(!require("BayesTree"))
   (install.packages("BayesTree"))
+if(!require("bartMachine"))
+  (install.packages("bartMachine"))
 
 
 ###Import Data

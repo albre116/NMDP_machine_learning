@@ -1,8 +1,8 @@
 #####################################################
-####Boosting Tutorial
+####Boosting and Backfitting Tutorial
 #####################################################
 source("data_prep.R")
-mu=c(1,2)#mean of simulated data
+optiomu=c(1,2)#mean of simulated data
 sig=matrix(c(1,0,0,2),nrow=2,byrow=T)
 x<-mvrnorm(n=1000,mu=mu,Sigma=sig)
 y<-1.5+3*x[,1]+rnorm(nrow(x),mean=0,sd=1) ###make simple association with x1
@@ -359,56 +359,11 @@ for(race in par_disp){
 
 
 ####################################
-####Work with BART Package
+####Work with bartMachine Package (this is better than the BayesTree package)
+####bartMachine  uses rJava to use a complied language for the run (way faster)
+####plus it has a predict funciton that BayesTree lacks
 ####Lets look at some genomic data
 ####################################
-##simulate data (example from Friedman MARS paper)
-f = function(x){
-  10*sin(pi*x[,1]*x[,2]) + 20*(x[,3]-.5)^2+10*x[,4]+5*x[,5]
-}
-sigma = 1.0  #y = f(x) + sigma*z , z~N(0,1)
-n = 100      #number of observations
-set.seed(99)
-x=matrix(runif(n*10),n,10) #10 variables, only first 5 matter
-Ey = f(x)
-y=Ey+sigma*rnorm(n)
-lmFit = lm(y~.,data.frame(x,y)) #compare lm fit to BART later
-##run BART
-set.seed(99)
-bartFit = bart(x,y,ndpost=200) #default is ndpost=1000, this is to run example fast.
-plot(bartFit) # plot bart fit
-##compare BART fit to linear matter and truth = Ey
-fitmat = cbind(y,Ey,lmFit$fitted,bartFit$yhat.train.mean)
-colnames(fitmat) = c('y','Ey','lm','bart')
-print(cor(fitmat))
-
-##simulate data (example from Friedman MARS paper)
-##simulate data 
-f = function(x) { return(.5*x[,1] + 2*x[,2]*x[,3]) }
-sigma=.2 # y = f(x) + sigma*z
-n=100 #number of observations
-set.seed(27)
-x = matrix(2*runif(n*3)-1,ncol=3) ; colnames(x) = c('rob','hugh','ed')
-Ey = f(x)
-y = Ey +  sigma*rnorm(n)
-lmFit = lm(y~.,data.frame(x,y)) #compare lm fit to BART later
-par(mfrow=c(1,3)) #first two for pdbart, third for pd2bart
-##pdbart: one dimensional partial dependence plot
-set.seed(99)
-pdb1 = pdbart(x,y,xind=c(1,2),
-              levs=list(seq(-1,1,.2),seq(-1,1,.2)),pl=FALSE,
-              keepevery=10,ntree=100,nskip=100,ndpost=200) #should run longer!
-plot(pdb1,ylim=c(-.6,.6))
-##pd2bart: two dimensional partial dependence plot
-set.seed(99)
-pdb2 = pd2bart(x,y,xind=c(2,3),
-               levquants=c(.05,.1,.25,.5,.75,.9,.95),pl=FALSE,
-               ntree=100,keepevery=10,verbose=FALSE,nskip=100,ndpost=200) #should run longer!
-plot(pdb2)
-##compare BART fit to linear model and truth = Ey
-fitmat = cbind(y,Ey,lmFit$fitted,pdb1$yhat.train.mean)
-colnames(fitmat) = c('y','Ey','lm','bart')
-print(cor(fitmat))
 
 
 ###pull in a balanced data set of genomic expression
@@ -419,18 +374,25 @@ summary(promotergene)
 
 x=promotergene %>% select(-Class)
 y=promotergene %>% select(Class)
-y=y$Class  ###we have to make the response a factor instead of a data.frame
-
-
-bfit <- bart(x,y)
-plot(bfit)
+y=y$Class
 
 
 
+####use the BartMachine pacakge to fit models
+###you have to set the java heap early on (fyi) before the first rJava call
+set_bart_machine_num_cores(4)
+fit <- bartMachine(X=x,y=y)
+gc()
+fit
+predict(fit,x[1,])
+plot_convergence_diagnostics(fit)
+calc_credible_intervals(fit,x[1,],ci_conf=0.95)###CI for mean function E(Y|x)=f(x)
+investigate_var_importance(fit,num_var_plot = 50)
 
+cov_importance_test(fit)###omnibus test
+cov_importance_test(fit, covariates = c("V18"))###test V18 after adjustment for other covariates
 
-
-
+pd_plot(fit,j=10)
 
 
 
