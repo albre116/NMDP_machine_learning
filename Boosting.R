@@ -423,6 +423,10 @@ y=y$Class  ###we have to make the response a factor instead of a data.frame
 
 
 bfit <- bart(x,y)
+plot(bfit)
+
+
+
 
 
 
