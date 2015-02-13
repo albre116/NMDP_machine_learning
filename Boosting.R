@@ -426,7 +426,7 @@ for(i in prob_rule){
   print(fit_roc$confusion_matrix)
   tmp <- data.frame(
     "DecisionRuleForPositive"=round(i,2),
-    "TruePosRate"=fit_roc$confusion_matrix$"model errors"[1],
+    "TruePosRate"=1-fit_roc$confusion_matrix$"model errors"[1],
     "FalsePosRate"=fit_roc$confusion_matrix$"model errors"[2])
   ROC_Data <- bind_rows(ROC_Data,tmp)
 }
@@ -434,7 +434,8 @@ for(i in prob_rule){
 
 datatable(ROC_Data,options = list(pageLength=nrow(ROC_Data)))
 
-h1 <- plot(TruePosRate~FalsePosRate,data=ROC_Data)
+
+rPlot(TruePosRate~FalsePosRate,data=ROC_Data,type="point")
 
 
 
