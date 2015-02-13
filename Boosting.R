@@ -369,9 +369,9 @@ for(race in par_disp){
 ###pull in a balanced data set of genomic expression
 ###for non-balanced you should be using weights
 ###unless you expect your margin to come into play
+###with regards to your loss function
 data(promotergene)
 summary(promotergene)
-
 x=promotergene %>% select(-Class)
 y=promotergene %>% select(Class)
 y=y$Class
@@ -382,8 +382,19 @@ y=y$Class
 ###you have to set the java heap early on (fyi) before the first rJava call
 set_bart_machine_num_cores(4)
 fit <- bartMachineCV(X=x,y=y)
+summary(fit)
 gc()
-fit
+
+
+###check the fit on k-fold cross validation
+oos_stats <- k_fold_cv(X=x,y=y,k_folds = 5,prob_rule_class=0.7)###set an unreasonable rule default is 0.5
+oos_stats$confusion_matrix
+
+
+
+
+
+
 predict(fit,x[1,])
 plot_convergence_diagnostics(fit)
 calc_credible_intervals(fit,x[1,],ci_conf=0.95)###CI for mean function E(Y|x)=f(x)
@@ -393,6 +404,37 @@ cov_importance_test(fit)###omnibus test
 cov_importance_test(fit, covariates = c("V18"))###test V18 after adjustment for other covariates
 
 pd_plot(fit,j=10)
+
+
+
+
+
+
+
+###lets generate an ROC curve as a function of the prob_rule_classification parameter
+###this will help us select the best model for our purposes
+###to do this we need to think a bit about loss and pick a function that meets our goals
+###if we want equal misclassification costs, the parameter value should be the upper left elbow
+###in the curve
+
+###change probability rule for classification
+prob_rule <- seq(0,1,by=0.1)
+i=prob_rule[1]
+ROC_Data <- data.frame()
+for(i in prob_rule){
+  fit_roc <- bartMachine(X=x,y=y,prob_rule_class=1-i)
+  print(fit_roc$confusion_matrix)
+  tmp <- data.frame(
+    "DecisionRuleForPositive"=round(i,2),
+    "TruePosRate"=fit_roc$confusion_matrix$"model errors"[1],
+    "FalsePosRate"=fit_roc$confusion_matrix$"model errors"[2])
+  ROC_Data <- bind_rows(ROC_Data,tmp)
+}
+
+
+datatable(ROC_Data,options = list(pageLength=nrow(ROC_Data)))
+
+h1 <- plot(TruePosRate~FalsePosRate,data=ROC_Data)
 
 
 

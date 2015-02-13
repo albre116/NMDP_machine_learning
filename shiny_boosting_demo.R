@@ -33,7 +33,7 @@ body <- dashboardBody(
 shinyApp(
   ui = dashboardPage(
     dashboardHeader(title = "tabBoxes"),
-    dashboardSidebar(),
+    dashboardSidebar(disable=TRUE),
     body
   ),
   server = function(input, output) {

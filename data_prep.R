@@ -47,6 +47,17 @@ if(!require("shiny"))
   (install.packages("shiny"))
 if(!require("shinydashboard"))
   (devtools::install_github("rstudio/shinydashboard"))
+if (!require("DT")) 
+  (devtools::install_github("rstudio/DT"))
+if (!require("dygraphs")) 
+  (install.packages("dygraphs"))
+if (!require("datasets")) 
+  (install.packages("datasets"))
+if (!require("rCharts")) 
+  (install_github('rCharts', 'ramnathv'))
+
+
+
 
 
 
