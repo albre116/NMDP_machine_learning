@@ -43,6 +43,11 @@ if(!require("BayesTree"))
   (install.packages("BayesTree"))
 if(!require("bartMachine"))
   (install.packages("bartMachine"))
+if(!require("shiny"))
+  (install.packages("shiny"))
+if(!require("shinydashboard"))
+  (devtools::install_github("rstudio/shinydashboard"))
+
 
 
 ###Import Data

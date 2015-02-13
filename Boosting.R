@@ -2,7 +2,7 @@
 ####Boosting and Backfitting Tutorial
 #####################################################
 source("data_prep.R")
-optiomu=c(1,2)#mean of simulated data
+mu=c(1,2)#mean of simulated data
 sig=matrix(c(1,0,0,2),nrow=2,byrow=T)
 x<-mvrnorm(n=1000,mu=mu,Sigma=sig)
 y<-1.5+3*x[,1]+rnorm(nrow(x),mean=0,sd=1) ###make simple association with x1
@@ -381,7 +381,7 @@ y=y$Class
 ####use the BartMachine pacakge to fit models
 ###you have to set the java heap early on (fyi) before the first rJava call
 set_bart_machine_num_cores(4)
-fit <- bartMachine(X=x,y=y)
+fit <- bartMachineCV(X=x,y=y)
 gc()
 fit
 predict(fit,x[1,])
