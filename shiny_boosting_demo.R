@@ -65,10 +65,9 @@ body <- dashboardBody(
                        )
                 )
     ),###end box
-    box(status = "primary",title = "Descent Path", solidHeader = TRUE, width = NULL,collapsible = T,
+    box(status = "primary",title = "Descent Path & Residuals", solidHeader = TRUE, width = NULL,collapsible = T,
+        plotOutput("gradient_residuals"),
         plotOutput("descent_path")
-        
-        
         )###end box
     )
     
@@ -239,7 +238,8 @@ server <-   function(input, output, session) {
       beta_history[1+i,] <- beta
     }
     
-    return(list(beta=beta,nboost=nboost,beta_history=beta_history))
+    return(list(beta=beta,nboost=nboost,beta_history=beta_history,
+                grad_plot=grad_plot,fit=fit))
     
   })
   
@@ -258,6 +258,18 @@ server <-   function(input, output, session) {
       ggtitle(paste("Model Fit: (f_x)=",fit_slope,"  After M=",nboost,"Boosting Iterations"))
     print(plot)
     
+  })
+  
+  output$gradient_residuals <- renderPlot({
+    grad_plot <- GRADIENT()[["grad_plot"]]
+    fit <- GRADIENT()[["fit"]]
+    nboost <- GRADIENT()[["nboost"]]
+    ####look at the gradient residuals of the last fit to which the base
+    ####learner is being fit
+    plot <- ggplot(data=grad_plot,aes(x=x,y=neg_grad))+geom_point()+
+    geom_abline(intercept = fit$coefficients[1], slope = fit$coefficients[2])+
+    ggtitle(paste("Gradient Residuals After M=",nboost,"Boosting Iterations"))
+    print(plot)
   })
   
   
