@@ -15,6 +15,13 @@ shinyApp( ui = dashboardPage(header,sidebar,body), server = server)
 
 ###first lets do the prior example with the mboost package
 ###start with the linear regression model using least squares
+
+mu=c(1,2)#mean of simulated data
+sig=matrix(c(1,0,0,2),nrow=2,byrow=T)
+x<-mvrnorm(n=1000,mu=mu,Sigma=sig)
+y<-1.5+3*x[,1]+rnorm(nrow(x),mean=0,sd=1) ###make simple association with x1
+data=data.frame(x=x[,1],y=y)
+
 lm <- lm(y~x,data=data)
 coef(lm)
 
@@ -56,7 +63,7 @@ plot(gam1)
 ###better
 preds <- data.frame(f_x=predict(gam1),data.frame(model.frame(gam1))["X1"]) %>% arrange(X1)
 ggplot(data,aes(x=X1,y=y))+geom_point()+
-  ggtitle("Fit to Data of Linear Bols") +
+  ggtitle("Fit to Data of Spline Bols") +
   geom_line(data=preds,aes(x=X1,y=f_x))
 
 
