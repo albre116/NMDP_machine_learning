@@ -55,6 +55,12 @@ if (!require("datasets"))
   (install.packages("datasets"))
 if (!require("rCharts")) 
   (install_github('rCharts', 'ramnathv'))
+if (!require("shinysky")) 
+  (install_github("AnalytixWare/ShinySky"))
+if (!require("shinyTable")) 
+  (install_github("shinyTable", "trestletech"))
+
+
 
 
 
