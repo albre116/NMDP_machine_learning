@@ -290,7 +290,7 @@ for(race in par_disp){
 ####plus it has a predict funciton that BayesTree lacks
 ####Lets look at some genomic data
 ####################################
-
+source("data_prep.R")
 
 ###pull in a balanced data set of genomic expression
 ###for non-balanced you should be using weights
@@ -312,27 +312,41 @@ summary(fit)
 gc()
 
 
-###check the fit on k-fold cross validation
-oos_stats <- k_fold_cv(X=x,y=y,k_folds = 5,prob_rule_class=0.7)###set an unreasonable rule default is 0.5
-oos_stats$confusion_matrix
-
-
-
-
-
-
-predict(fit,x[1,])
+####look at convergence
 plot_convergence_diagnostics(fit)
-calc_credible_intervals(fit,x[1,],ci_conf=0.95)###CI for mean function E(Y|x)=f(x)
-investigate_var_importance(fit,num_var_plot = 50)
 
+####look at posterior distribution
+predict(fit,x[1,],type="prob")
+predict(fit,x[1,],type="class")
+calc_credible_intervals(fit,x[1,],ci_conf=0.95)###CI for mean function E(Y|x)=f(x)
+
+####check out importance of different variables
+investigate_var_importance(fit,num_var_plot = 50)
 cov_importance_test(fit)###omnibus test
 cov_importance_test(fit, covariates = c("V18"))###test V18 after adjustment for other covariates
 
+
+####variable importance inclusion criteria
+vs <- var_selection_by_permute(fit,bottom_margin = 10,num_permute_samples = 10,num_var_plot = 20)
+vs$important_vars_local_names
+vs$important_vars_global_max_names
+vs$important_vars_global_se_names
+
+
+#####check for interactions
+interaction_investigator(fit,num_replicates_for_avg = 25,num_var_plot = 10, bottom_margin = 20)
+
+
+
+####look at partial depencence effect
 pd_plot(fit,j=10)
 
 
 
+
+###check the fit on k-fold cross validation
+oos_stats <- k_fold_cv(X=x,y=y,k_folds = 5,prob_rule_class=0.9)###set an unreasonable rule default is 0.5
+oos_stats$confusion_matrix
 
 
 
@@ -359,8 +373,6 @@ for(i in prob_rule){
 
 
 datatable(ROC_Data,options = list(pageLength=nrow(ROC_Data)))
-
-
 rPlot(TruePosRate~FalsePosRate,data=ROC_Data,type="point")
 
 
